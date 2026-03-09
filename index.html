@@ -1,0 +1,2459 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LASERPLOT — SVG → PLT Converter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Palette iOS/macOS */
+  --bg: #F5F5F7;
+  --surface: #FFFFFF;
+  --surface2: #F5F5F7;
+  --border: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.15);
+  --accent: #005092;
+  --accent2: #003d6e;
+  --accent-light: rgba(0, 80, 146, 0.08);
+  --text: #1D1D1F;
+  --text-dim: #86868B;
+  --green: #34C759;
+  --red: #FF3B30;
+  --yellow: #FF9500;
+
+  /* Typographie */
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: "SF Mono", SFMono-Regular, ui-monospace, "DM Mono", Menlo, monospace;
+
+  /* Espacements */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* Rayons */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+
+  /* Ombres */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.08);
+
+  /* Transitions */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 100px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* ── HEADER (Glassmorphism) ── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px var(--space-lg);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 0.5px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.logo {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  border: none;
+  position: relative;
+  flex-shrink: 0;
+}
+.logo::after {
+  content: '';
+  position: absolute;
+  width: 8px; height: 8px;
+  background: #fff;
+  border-radius: 2px;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.header-title {
+  flex: 1;
+}
+.header-title h1 {
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.022em;
+}
+.header-title span {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.header-badge {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: var(--surface2);
+  padding: 5px 14px;
+  border: 0.5px solid var(--border);
+  border-radius: 100px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ── MAIN LAYOUT ── */
+.main {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  background: var(--surface);
+  border-right: 0.5px solid var(--border);
+  overflow-y: auto;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin-top: var(--space-md);
+}
+.section-label:first-child { margin-top: 0; }
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 0.5px;
+  background: var(--border);
+}
+
+/* ── FORM ELEMENTS ── */
+.field-label {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  margin-top: 10px;
+  margin-bottom: var(--space-xs);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-btn {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 0.5px solid var(--border);
+  background: var(--surface2);
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: help;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+.info-btn:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+input[type="number"], select {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 15px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  outline: none;
+  transition: var(--transition);
+}
+input[type="number"]:focus, select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+select {
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2386868B' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+.row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* ── CHECKBOX ── */
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: var(--space-sm);
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text);
+  letter-spacing: 0;
+  user-select: none;
+}
+.check-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--surface2);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+.check-row input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.check-row input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px; top: 2px;
+  width: 5px; height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* ── RANGE SLIDER ── */
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: var(--space-xs);
+}
+input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--border-strong);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px; height: 22px;
+  background: #fff;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: box-shadow 0.2s var(--ease);
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 22px; height: 22px;
+  background: #fff;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+.range-val {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── PRESET BUTTONS ── */
+.preset-btns {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: 6px;
+}
+.btn-preset {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 9px 0;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-preset:hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+}
+.btn-preset:active { transform: scale(0.98); }
+.btn-preset svg { width: 14px; height: 14px; }
+
+/* ── DROPZONE ── */
+.dropzone {
+  position: relative;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: var(--space-sm);
+}
+.dropzone:hover, .dropzone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.dropzone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.dropzone-text {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+.dropzone-text strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+.file-info {
+  display: none;
+  margin-top: var(--space-sm);
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--green);
+  gap: 6px;
+  align-items: center;
+}
+.file-info.visible { display: flex; }
+.file-info svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ── HATCH PANEL ── */
+.hatch-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  transition: opacity 0.3s var(--ease);
+}
+
+.hatch-preview-box {
+  margin-top: var(--space-sm);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm);
+  overflow: hidden;
+}
+.hatch-preview-box svg {
+  width: 100%;
+  height: auto;
+}
+
+/* ── CONVERT BUTTON ── */
+.btn-convert {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  margin-top: var(--space-md);
+  transition: var(--transition);
+}
+.btn-convert:hover:not(:disabled) {
+  background: var(--accent2);
+  box-shadow: 0 4px 16px rgba(0, 80, 146, 0.25);
+  transform: translateY(-1px);
+}
+.btn-convert:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.btn-convert:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── OUTPUT PANEL ── */
+.output-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.output-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--space-lg);
+  border-bottom: 0.5px solid var(--border);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.output-toolbar h2 {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+}
+.btn-download {
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  gap: 6px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 8px 16px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-download:hover { background: var(--accent2); }
+.btn-download:active { transform: scale(0.98); }
+.btn-download svg { width: 14px; height: 14px; }
+.btn-download.visible { opacity: 1; pointer-events: auto; }
+
+.stats-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  padding: 0 var(--space-lg);
+  max-height: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border-bottom: 0.5px solid transparent;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 0;
+  transition: max-height 0.3s var(--ease), padding 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+.stats-bar.visible {
+  max-height: 60px;
+  padding: 10px var(--space-lg);
+  border-bottom-color: var(--border);
+}
+.stat-item span { color: var(--text); font-weight: 600; }
+
+.output-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-lg);
+}
+
+/* ── PLACEHOLDER ── */
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-md);
+}
+.placeholder-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: var(--space-sm);
+}
+.placeholder-grid .sq {
+  width: 12px; height: 12px;
+  border: 0.5px solid var(--border);
+  border-radius: 3px;
+}
+.placeholder p {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.6;
+}
+.placeholder.hidden { display: none; }
+
+/* ── ALERTS ── */
+.alert {
+  padding: 10px var(--space-md);
+  font-family: var(--sans);
+  font-size: 13px;
+  margin-bottom: 0;
+  line-height: 1.5;
+  border-radius: var(--radius-md);
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.3s var(--ease), max-height 0.3s var(--ease), margin-bottom 0.3s var(--ease), padding 0.3s var(--ease);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.alert.visible {
+  max-height: 200px;
+  opacity: 1;
+  margin-bottom: var(--space-md);
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.alert-warn {
+  background: rgba(255, 149, 0, 0.06);
+  border: 0.5px solid rgba(255, 149, 0, 0.2);
+  color: #C77C00;
+}
+.alert-error {
+  background: rgba(255, 59, 48, 0.06);
+  border: 0.5px solid rgba(255, 59, 48, 0.2);
+  color: var(--red);
+}
+.alert-success {
+  background: rgba(52, 199, 89, 0.06);
+  border: 0.5px solid rgba(52, 199, 89, 0.2);
+  color: #248A3D;
+}
+
+/* ── SVG PREVIEW ── */
+.svg-preview {
+  margin-bottom: var(--space-md);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  padding: var(--space-md);
+  text-align: center;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: opacity 0.3s var(--ease), max-height 0.3s var(--ease);
+}
+.svg-preview.visible {
+  opacity: 1;
+  max-height: 300px;
+}
+.svg-preview svg {
+  max-width: 100%;
+  max-height: 170px;
+}
+
+/* ── PLT PREVIEW ── */
+.plt-preview {
+  margin-top: var(--space-sm);
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+  visibility: hidden;
+}
+.plt-preview.visible {
+  opacity: 1;
+  visibility: visible;
+}
+.plt-preview pre {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.cmd-init { color: var(--green); }
+.cmd-move { color: var(--accent); }
+.cmd-draw { color: #1D1D1F; }
+
+/* ── MODAL ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.visible { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-lg);
+  width: 380px;
+  max-width: 90vw;
+}
+.modal h3 {
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  text-transform: none;
+  margin-bottom: var(--space-md);
+  color: var(--text);
+}
+.modal input[type="text"] {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 15px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  outline: none;
+  margin-bottom: var(--space-md);
+  transition: var(--transition);
+}
+.modal input[type="text"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.modal-btns {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+.modal-btns button {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 9px 18px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface2);
+  color: var(--text);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.modal-btns button:hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.modal-btns button:active { transform: scale(0.98); }
+.modal-btns .btn-confirm {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.modal-btns .btn-confirm:hover {
+  background: var(--accent2);
+  border-color: var(--accent2);
+}
+
+/* ── TOOLTIP ── */
+#globalTooltip {
+  display: none;
+  position: fixed;
+  z-index: 200;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 14px 16px;
+  max-width: 280px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+#globalTooltip.visible { display: block; }
+#globalTooltip::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 16px;
+  width: 10px; height: 10px;
+  background: var(--surface);
+  border-left: 0.5px solid var(--border);
+  border-bottom: 0.5px solid var(--border);
+  transform: rotate(45deg);
+}
+#globalTooltip .tt-title {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+#globalTooltip .tt-body {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* ── ANIMATIONS ── */
+@keyframes pulse-border {
+  0%, 100% { border-color: var(--accent); }
+  50% { border-color: var(--accent2); background: var(--accent-light); }
+}
+.dropzone.drag-over {
+  animation: pulse-border 1.2s var(--ease) infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.btn-convert.loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+.btn-convert.loading::after {
+  content: '';
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* ── FOCUS STATES ── */
+input[type="number"]:focus-visible,
+select:focus-visible,
+input[type="range"]:focus-visible,
+.btn-preset:focus-visible,
+.btn-convert:focus-visible,
+.btn-download:focus-visible,
+.info-btn:focus-visible,
+.modal-btns button:focus-visible,
+.toggle-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.check-row input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── PLT CANVAS & VIEW TOGGLE ── */
+.plt-view-toggle {
+  display: none;
+  margin-bottom: var(--space-sm);
+}
+.plt-view-toggle.visible { display: flex; }
+.toggle-btn {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  padding: 7px 18px;
+  border: 0.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.toggle-btn:first-child {
+  border-right: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+.toggle-btn:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.toggle-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+#pltCanvas {
+  display: none;
+  width: 100%;
+  height: auto;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+#pltCanvas.visible { display: block; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1024px) {
+  .main { grid-template-columns: 340px 1fr; }
+  .sidebar { padding: var(--space-md); }
+}
+
+@media (max-width: 768px) {
+  .main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .sidebar {
+    max-height: 50vh;
+    overflow-y: auto;
+    border-right: none;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .header { padding: 12px var(--space-md); }
+  .header-badge { display: none; }
+  .output-toolbar { padding: 12px var(--space-md); }
+  .output-content { padding: var(--space-md); }
+  .stats-bar.visible { padding: 10px var(--space-md); }
+  #globalTooltip {
+    max-width: 220px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar { padding: var(--space-sm) var(--space-md); }
+  .preset-btns { flex-direction: column; }
+  .row-2 { grid-template-columns: 1fr; }
+  .header-title h1 { font-size: 15px; }
+  .output-content { padding: var(--space-md); }
+  .btn-convert { font-size: 14px; padding: 12px; }
+}
+
+/* ── DARK MODE TOGGLE BUTTON ── */
+.btn-theme {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: 0.5px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+.btn-theme:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.btn-theme svg { width: 16px; height: 16px; pointer-events: none; }
+.btn-theme .icon-moon { display: block; }
+.btn-theme .icon-sun  { display: none; }
+[data-theme="dark"] .btn-theme .icon-moon { display: none; }
+[data-theme="dark"] .btn-theme .icon-sun  { display: block; }
+
+/* ── DARK MODE — CSS Variables ── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --surface: #1C1C1E;
+    --surface2: #2C2C2E;
+    --border: rgba(255, 255, 255, 0.1);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --accent: #0A84FF;
+    --accent2: #0060DF;
+    --accent-light: rgba(10, 132, 255, 0.15);
+    --text: #F5F5F7;
+    --text-dim: #8E8E93;
+    --green: #30D158;
+    --red: #FF453A;
+    --yellow: #FFD60A;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --surface: #1C1C1E;
+  --surface2: #2C2C2E;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --accent: #0A84FF;
+  --accent2: #0060DF;
+  --accent-light: rgba(10, 132, 255, 0.15);
+  --text: #F5F5F7;
+  --text-dim: #8E8E93;
+  --green: #30D158;
+  --red: #FF453A;
+  --yellow: #FFD60A;
+}
+:root[data-theme="light"] {
+  --bg: #F5F5F7;
+  --surface: #FFFFFF;
+  --surface2: #F5F5F7;
+  --border: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.15);
+  --accent: #005092;
+  --accent2: #003d6e;
+  --accent-light: rgba(0, 80, 146, 0.08);
+  --text: #1D1D1F;
+  --text-dim: #86868B;
+  --green: #34C759;
+  --red: #FF3B30;
+  --yellow: #FF9500;
+}
+
+/* ── DARK MODE — Hardcoded colour overrides ── */
+@media (prefers-color-scheme: dark) {
+  .header        { background: rgba(28, 28, 30, 0.72); }
+  .output-toolbar { background: rgba(28, 28, 30, 0.72); }
+  .svg-preview   { background: var(--surface); }
+  #pltCanvas     { background: var(--surface); }
+  .cmd-draw      { color: var(--text); }
+  input[type="range"]::-webkit-slider-thumb { background: #3A3A3C; border-color: rgba(255,255,255,0.2); }
+  input[type="range"]::-moz-range-thumb     { background: #3A3A3C; border-color: rgba(255,255,255,0.2); }
+}
+[data-theme="dark"] .header        { background: rgba(28, 28, 30, 0.72); }
+[data-theme="dark"] .output-toolbar { background: rgba(28, 28, 30, 0.72); }
+[data-theme="dark"] .svg-preview   { background: var(--surface); }
+[data-theme="dark"] #pltCanvas     { background: var(--surface); }
+[data-theme="dark"] .cmd-draw      { color: var(--text); }
+[data-theme="dark"] input[type="range"]::-webkit-slider-thumb { background: #3A3A3C; border-color: rgba(255,255,255,0.2); }
+[data-theme="dark"] input[type="range"]::-moz-range-thumb     { background: #3A3A3C; border-color: rgba(255,255,255,0.2); }
+[data-theme="light"] .header        { background: rgba(255, 255, 255, 0.72); }
+[data-theme="light"] .output-toolbar { background: rgba(255, 255, 255, 0.72); }
+[data-theme="light"] .svg-preview   { background: #fff; }
+[data-theme="light"] #pltCanvas     { background: #fff; }
+[data-theme="light"] .cmd-draw      { color: #1D1D1F; }
+[data-theme="light"] input[type="range"]::-webkit-slider-thumb { background: #fff; border-color: var(--border-strong); }
+[data-theme="light"] input[type="range"]::-moz-range-thumb     { background: #fff; border-color: var(--border-strong); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo"></div>
+  <div class="header-title">
+    <h1>LASERPLOT</h1>
+    <span>Convertisseur SVG vers PLT (HPGL/2)</span>
+  </div>
+  <div class="header-badge">HPGL/2 · LOCAL · NO UPLOAD</div>
+  <button class="btn-theme" id="btnTheme" aria-label="Basculer le thème sombre/clair">
+    <!-- Moon icon (shown in light mode) -->
+    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+    <!-- Sun icon (shown in dark mode) -->
+    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="5"/>
+      <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+      <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+    </svg>
+  </button>
+</header>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- Presets -->
+    <div class="section-label">Presets</div>
+    <div class="preset-btns">
+      <button class="btn-preset" id="btnSavePreset" aria-label="Sauvegarder le preset">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        SAUVEGARDER
+      </button>
+      <button class="btn-preset" id="btnLoadPreset" aria-label="Charger un preset">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        CHARGER
+      </button>
+      <input type="file" id="presetFileInput" accept=".json" style="display:none">
+    </div>
+
+    <!-- Fichier source -->
+    <div class="section-label">Fichier source</div>
+    <div class="dropzone" id="dropzone" role="button" aria-label="Sélectionner un fichier SVG">
+      <input type="file" id="fileInput" accept=".svg" aria-label="Choisir un fichier SVG">
+      <div class="dropzone-text">
+        Glisser un fichier <strong>.SVG</strong> ici<br>ou cliquer pour parcourir
+      </div>
+    </div>
+    <div class="file-info" id="fileInfo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span id="fileName"></span>
+    </div>
+
+    <!-- Format de sortie -->
+    <div class="section-label">Format de sortie</div>
+    <label class="field-label" for="pageFormat">
+      FORMAT PAGE
+      <button type="button" class="info-btn" tabindex="0" data-tooltip="FORMAT DE PAGE|||Sélectionnez un format standard ou choisissez « Personnalisé » pour entrer vos propres dimensions." aria-label="Info format de page">i</button>
+    </label>
+    <select id="pageFormat">
+      <option value="custom">Personnalisé</option>
+      <option value="a4" selected>A4 (210 × 297 mm)</option>
+      <option value="a3">A3 (297 × 420 mm)</option>
+      <option value="a2">A2 (420 × 594 mm)</option>
+      <option value="letter">Letter (216 × 279 mm)</option>
+    </select>
+
+    <div class="row-2">
+      <div>
+        <label class="field-label" for="pageW">LARGEUR (mm)</label>
+        <input type="number" id="pageW" value="210" min="1">
+      </div>
+      <div>
+        <label class="field-label" for="pageH">HAUTEUR (mm)</label>
+        <input type="number" id="pageH" value="297" min="1">
+      </div>
+    </div>
+
+    <label class="field-label" for="margin">
+      MARGE (mm)
+      <button type="button" class="info-btn" tabindex="0" data-tooltip="MARGE|||Espace de sécurité en millimètres autour de la zone de gravure. Recommandé : 5-10 mm pour les graveurs laser." aria-label="Info marge">i</button>
+    </label>
+    <input type="number" id="margin" value="5" min="0">
+
+    <label class="check-row">
+      <input type="checkbox" id="fitPage" checked>
+      MISE À L'ÉCHELLE AUTOMATIQUE
+    </label>
+
+    <!-- Paramètres HPGL -->
+    <div class="section-label">Paramètres HPGL</div>
+    <label class="field-label" for="curveRes">
+      RÉSOLUTION DES COURBES
+      <button type="button" class="info-btn" tabindex="0" data-tooltip="RÉSOLUTION COURBES|||Nombre de segments utilisés pour approximer chaque courbe de Bézier ou arc. <br>Bas (8-16) : fichier léger, rendu anguleux.<br>Haut (64-128) : rendu lisse, fichier plus lourd." aria-label="Info résolution des courbes">i</button>
+    </label>
+    <div class="range-row">
+      <input type="range" id="curveRes" min="8" max="128" step="8" value="32">
+      <span class="range-val" id="curveResVal">32</span>
+    </div>
+
+    <!-- Hachures -->
+    <div class="section-label">Remplissage (hachures)</div>
+    <label class="check-row">
+      <input type="checkbox" id="hatchEnable">
+      ACTIVER LE REMPLISSAGE
+    </label>
+
+    <div id="hatchPanel" class="hatch-disabled">
+      <div class="hatch-preview-box">
+        <svg id="hatchPreviewSvg" viewBox="0 0 200 76" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="8" width="160" height="60" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+        </svg>
+      </div>
+
+      <label class="field-label" for="hatchType">TYPE DE REMPLISSAGE</label>
+      <select id="hatchType">
+        <option value="lines">Lignes parallèles</option>
+        <option value="cross">Croisées (Crosshatch)</option>
+      </select>
+
+      <label class="field-label" for="hatchSpacing">
+        ESPACEMENT DES LIGNES (mm)
+        <button type="button" class="info-btn" tabindex="0" data-tooltip="ESPACEMENT|||Distance entre chaque ligne de hachure en millimètres. Un espacement fin (0.1-0.3) donne un remplissage dense, un espacement large (1-3) un motif aéré." aria-label="Info espacement">i</button>
+      </label>
+      <div class="range-row">
+        <input type="range" id="hatchSpacing" min="0.1" max="3" step="0.1" value="0.5">
+        <span class="range-val" id="hatchSpacingVal">0.5</span>
+      </div>
+
+      <label class="field-label" for="hatchAngle">ANGLE DES LIGNES (deg)</label>
+      <div class="range-row">
+        <input type="range" id="hatchAngle" min="0" max="175" step="5" value="45">
+        <span class="range-val" id="hatchAngleVal">45°</span>
+      </div>
+
+      <label class="check-row">
+        <input type="checkbox" id="hatchContoursAlso" checked>
+        CONSERVER LES CONTOURS
+      </label>
+      <label class="check-row">
+        <input type="checkbox" id="hatchBidirectional" checked>
+        TRAJET BIDIRECTIONNEL
+      </label>
+    </div>
+
+    <button class="btn-convert" id="btnConvert" disabled>CONVERTIR EN PLT</button>
+  </aside>
+
+  <!-- OUTPUT PANEL -->
+  <section class="output-panel">
+    <div class="output-toolbar">
+      <h2>OUTPUT // .PLT</h2>
+      <button class="btn-download" id="btnDownload" aria-label="Télécharger le fichier PLT">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        TÉLÉCHARGER .PLT
+      </button>
+    </div>
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-item">COMMANDES <span id="statCmds">0</span></div>
+      <div class="stat-item">DIST. GRAVURE <span id="statDist">0 mm</span></div>
+      <div class="stat-item">ÉLÉMENTS <span id="statElems">0</span></div>
+      <div class="stat-item">HACHURES <span id="statHatch">0</span></div>
+      <div class="stat-item">TAILLE <span id="statSize">0 Ko</span></div>
+    </div>
+    <div class="output-content">
+      <div class="placeholder" id="placeholder">
+        <div class="placeholder-grid">
+          <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
+          <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
+          <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
+          <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
+          <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
+        </div>
+        <p>Chargez un fichier SVG<br>pour commencer la conversion</p>
+      </div>
+
+      <div class="alert alert-warn" id="alertText" role="alert" aria-live="polite"></div>
+      <div class="alert alert-warn" id="alertHatch" role="alert" aria-live="polite"></div>
+      <div class="alert alert-success" id="alertSuccess" role="alert" aria-live="polite"></div>
+      <div class="alert alert-error" id="alertError" role="alert" aria-live="polite"></div>
+      <div class="svg-preview" id="svgPreview"></div>
+      <div class="plt-preview" id="pltPreview">
+        <div class="plt-view-toggle" id="pltViewToggle">
+          <button class="toggle-btn active" data-view="canvas">VISUEL</button>
+          <button class="toggle-btn" data-view="text">TEXTE</button>
+        </div>
+        <canvas id="pltCanvas" width="800" height="500"></canvas>
+        <pre id="pltCode"></pre>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>Sauvegarder le preset</h3>
+    <input type="text" id="presetName" placeholder="Nom du preset…">
+    <div class="modal-btns">
+      <button id="modalCancel">ANNULER</button>
+      <button class="btn-confirm" id="modalConfirm">TÉLÉCHARGER .JSON</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOOLTIP -->
+<div id="globalTooltip" role="tooltip">
+  <div class="tt-title"></div>
+  <div class="tt-body"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   LASERPLOT — SVG → PLT (HPGL/2) Converter
+   ═══════════════════════════════════════════════ */
+
+// ── State ──
+let svgContent = null;
+let pltResult = null;
+let svgBaseName = 'gravure';
+let pltViewMode = 'canvas';
+
+// ── DOM refs ──
+const $ = id => document.getElementById(id);
+const fileInput = $('fileInput');
+const dropzone = $('dropzone');
+const fileInfo = $('fileInfo');
+const fileName = $('fileName');
+const btnConvert = $('btnConvert');
+const btnDownload = $('btnDownload');
+const placeholder = $('placeholder');
+const svgPreview = $('svgPreview');
+const pltPreview = $('pltPreview');
+const pltCode = $('pltCode');
+const statsBar = $('statsBar');
+const alertText = $('alertText');
+const alertHatch = $('alertHatch');
+const alertSuccess = $('alertSuccess');
+const alertError = $('alertError');
+const hatchPanel = $('hatchPanel');
+const hatchEnable = $('hatchEnable');
+const modalOverlay = $('modalOverlay');
+const presetName = $('presetName');
+const curveRes = $('curveRes');
+const curveResVal = $('curveResVal');
+const hatchSpacing = $('hatchSpacing');
+const hatchSpacingVal = $('hatchSpacingVal');
+const hatchAngle = $('hatchAngle');
+const hatchAngleVal = $('hatchAngleVal');
+const pageFormat = $('pageFormat');
+const tooltip = $('globalTooltip');
+const pltCanvas = $('pltCanvas');
+const pltViewToggle = $('pltViewToggle');
+
+// ── Dark Mode ──
+(function () {
+  const html = document.documentElement;
+  const btn = $('btnTheme');
+  const stored = localStorage.getItem('theme');
+  // Apply saved preference, otherwise rely on @media (prefers-color-scheme)
+  if (stored === 'dark' || stored === 'light') html.dataset.theme = stored;
+
+  btn.addEventListener('click', () => {
+    const isDark = html.dataset.theme === 'dark' ||
+      (!html.dataset.theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const next = isDark ? 'light' : 'dark';
+    html.dataset.theme = next;
+    localStorage.setItem('theme', next);
+  });
+})();
+
+// ══════════════════════════════════════════════════
+// 1. SVG PATH PARSER
+// ══════════════════════════════════════════════════
+
+function parsePathData(d) {
+  const tokenRe = /([MmZzLlHhVvCcSsQqTtAa])|([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/g;
+  const tokens = [];
+  let m;
+  while ((m = tokenRe.exec(d)) !== null) {
+    tokens.push(m[1] ? { cmd: m[1] } : { num: parseFloat(m[2]) });
+  }
+
+  const cmds = [];
+  let i = 0;
+  let cx = 0, cy = 0; // current point
+  let sx = 0, sy = 0; // start of subpath
+  let prevCmd = null;
+
+  function readNum() {
+    while (i < tokens.length && tokens[i].cmd !== undefined) i++;
+    if (i < tokens.length) return tokens[i++].num;
+    return 0;
+  }
+
+  while (i < tokens.length) {
+    let cmd;
+    if (tokens[i].cmd !== undefined) {
+      cmd = tokens[i].cmd;
+      i++;
+    } else {
+      // Implicit command
+      if (prevCmd === 'M') cmd = 'L';
+      else if (prevCmd === 'm') cmd = 'l';
+      else cmd = prevCmd;
+    }
+
+    const isRel = cmd === cmd.toLowerCase() && cmd !== 'z' && cmd !== 'Z';
+    const type = cmd.toUpperCase();
+
+    if (type === 'Z') {
+      cmds.push({ type: 'Z', x: sx, y: sy });
+      cx = sx; cy = sy;
+      prevCmd = cmd;
+      continue;
+    }
+
+    const bx = isRel ? cx : 0;
+    const by = isRel ? cy : 0;
+
+    switch (type) {
+      case 'M': {
+        const x = readNum() + bx, y = readNum() + by;
+        cmds.push({ type: 'M', x, y });
+        cx = x; cy = y; sx = x; sy = y;
+        break;
+      }
+      case 'L': {
+        const x = readNum() + bx, y = readNum() + by;
+        cmds.push({ type: 'L', x, y });
+        cx = x; cy = y;
+        break;
+      }
+      case 'H': {
+        const x = readNum() + (isRel ? cx : 0);
+        cmds.push({ type: 'L', x, y: cy });
+        cx = x;
+        break;
+      }
+      case 'V': {
+        const y = readNum() + (isRel ? cy : 0);
+        cmds.push({ type: 'L', x: cx, y });
+        cy = y;
+        break;
+      }
+      case 'C': {
+        const x1 = readNum() + bx, y1 = readNum() + by;
+        const x2 = readNum() + bx, y2 = readNum() + by;
+        const x3 = readNum() + bx, y3 = readNum() + by;
+        cmds.push({ type: 'C', x1, y1, x2, y2, x: x3, y: y3 });
+        cx = x3; cy = y3;
+        break;
+      }
+      case 'S': {
+        let rx1, ry1;
+        if (prevCmd === 'C' || prevCmd === 'c' || prevCmd === 'S' || prevCmd === 's') {
+          const prev = cmds[cmds.length - 1];
+          rx1 = 2 * cx - prev.x2;
+          ry1 = 2 * cy - prev.y2;
+        } else {
+          rx1 = cx; ry1 = cy;
+        }
+        const x2 = readNum() + bx, y2 = readNum() + by;
+        const x3 = readNum() + bx, y3 = readNum() + by;
+        cmds.push({ type: 'C', x1: rx1, y1: ry1, x2, y2, x: x3, y: y3 });
+        cx = x3; cy = y3;
+        break;
+      }
+      case 'Q': {
+        const x1 = readNum() + bx, y1 = readNum() + by;
+        const x2 = readNum() + bx, y2 = readNum() + by;
+        cmds.push({ type: 'Q', x1, y1, x: x2, y: y2 });
+        cx = x2; cy = y2;
+        break;
+      }
+      case 'T': {
+        let rx1, ry1;
+        if (prevCmd === 'Q' || prevCmd === 'q' || prevCmd === 'T' || prevCmd === 't') {
+          const prev = cmds[cmds.length - 1];
+          rx1 = 2 * cx - prev.x1;
+          ry1 = 2 * cy - prev.y1;
+        } else {
+          rx1 = cx; ry1 = cy;
+        }
+        const x2 = readNum() + bx, y2 = readNum() + by;
+        cmds.push({ type: 'Q', x1: rx1, y1: ry1, x: x2, y: y2 });
+        cx = x2; cy = y2;
+        break;
+      }
+      case 'A': {
+        const rx = readNum(), ry = readNum();
+        const xRot = readNum();
+        const laf = readNum();
+        const sf = readNum();
+        const x = readNum() + bx, y = readNum() + by;
+        cmds.push({ type: 'A', rx, ry, xRot, laf, sf, x, y });
+        cx = x; cy = y;
+        break;
+      }
+    }
+    prevCmd = cmd;
+  }
+  return cmds;
+}
+
+// ══════════════════════════════════════════════════
+// 2. CURVE TESSELLATION
+// ══════════════════════════════════════════════════
+
+function cubicPts(sx, sy, x1, y1, x2, y2, x3, y3, n) {
+  const pts = [];
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    const u = 1 - t;
+    const x = u*u*u*sx + 3*u*u*t*x1 + 3*u*t*t*x2 + t*t*t*x3;
+    const y = u*u*u*sy + 3*u*u*t*y1 + 3*u*t*t*y2 + t*t*t*y3;
+    pts.push({ x, y });
+  }
+  return pts;
+}
+
+function quadPts(sx, sy, x1, y1, x2, y2, n) {
+  const pts = [];
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    const u = 1 - t;
+    const x = u*u*sx + 2*u*t*x1 + t*t*x2;
+    const y = u*u*sy + 2*u*t*y1 + t*t*y2;
+    pts.push({ x, y });
+  }
+  return pts;
+}
+
+function arcPts(sx, sy, rx, ry, xrDeg, laf, sf, ex, ey, n) {
+  if (rx === 0 || ry === 0) return [{ x: ex, y: ey }];
+
+  rx = Math.abs(rx);
+  ry = Math.abs(ry);
+  const xr = xrDeg * Math.PI / 180;
+  const cosR = Math.cos(xr), sinR = Math.sin(xr);
+
+  // Step 1: Compute (x1', y1')
+  const dx2 = (sx - ex) / 2, dy2 = (sy - ey) / 2;
+  const x1p = cosR * dx2 + sinR * dy2;
+  const y1p = -sinR * dx2 + cosR * dy2;
+
+  // Step 2: Correct radii
+  let lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
+  if (lambda > 1) {
+    const sl = Math.sqrt(lambda);
+    rx *= sl;
+    ry *= sl;
+  }
+
+  // Step 3: Compute center
+  const rxSq = rx * rx, rySq = ry * ry;
+  const x1pSq = x1p * x1p, y1pSq = y1p * y1p;
+  let num = rxSq * rySq - rxSq * y1pSq - rySq * x1pSq;
+  let den = rxSq * y1pSq + rySq * x1pSq;
+  if (num < 0) num = 0;
+  let sq = Math.sqrt(num / den);
+  if (laf === sf) sq = -sq;
+
+  const cxp = sq * rx * y1p / ry;
+  const cyp = -sq * ry * x1p / rx;
+
+  const mx = (sx + ex) / 2, my = (sy + ey) / 2;
+  const cx = cosR * cxp - sinR * cyp + mx;
+  const cy = sinR * cxp + cosR * cyp + my;
+
+  // Step 4: Compute angles
+  function angle(ux, uy, vx, vy) {
+    const dot = ux * vx + uy * vy;
+    const len = Math.sqrt(ux * ux + uy * uy) * Math.sqrt(vx * vx + vy * vy);
+    let a = Math.acos(Math.max(-1, Math.min(1, dot / len)));
+    if (ux * vy - uy * vx < 0) a = -a;
+    return a;
+  }
+
+  const theta1 = angle(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry);
+  let dtheta = angle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry);
+
+  if (sf === 0 && dtheta > 0) dtheta -= 2 * Math.PI;
+  if (sf === 1 && dtheta < 0) dtheta += 2 * Math.PI;
+
+  // Step 5: Generate points
+  const pts = [];
+  for (let i = 1; i <= n; i++) {
+    const t = theta1 + dtheta * (i / n);
+    const px = rx * Math.cos(t);
+    const py = ry * Math.sin(t);
+    pts.push({
+      x: cosR * px - sinR * py + cx,
+      y: sinR * px + cosR * py + cy
+    });
+  }
+  return pts;
+}
+
+// ══════════════════════════════════════════════════
+// 3. TRANSFORM MATRICES
+// ══════════════════════════════════════════════════
+
+// Matrix: [a, b, c, d, tx, ty]
+// x' = a*x + c*y + tx
+// y' = b*x + d*y + ty
+
+function matMul(A, B) {
+  return [
+    A[0]*B[0] + A[2]*B[1],
+    A[1]*B[0] + A[3]*B[1],
+    A[0]*B[2] + A[2]*B[3],
+    A[1]*B[2] + A[3]*B[3],
+    A[0]*B[4] + A[2]*B[5] + A[4],
+    A[1]*B[4] + A[3]*B[5] + A[5]
+  ];
+}
+
+function localMat(el) {
+  const attr = el.getAttribute && el.getAttribute('transform');
+  if (!attr) return [1, 0, 0, 1, 0, 0];
+
+  let mat = [1, 0, 0, 1, 0, 0];
+  const re = /(matrix|translate|scale|rotate)\s*\(([^)]+)\)/g;
+  let m;
+  while ((m = re.exec(attr)) !== null) {
+    const args = m[2].split(/[\s,]+/).map(Number);
+    let t;
+    switch (m[1]) {
+      case 'matrix':
+        t = [args[0], args[1], args[2], args[3], args[4] || 0, args[5] || 0];
+        break;
+      case 'translate':
+        t = [1, 0, 0, 1, args[0], args[1] || 0];
+        break;
+      case 'scale': {
+        const sy = args[1] !== undefined ? args[1] : args[0];
+        t = [args[0], 0, 0, sy, 0, 0];
+        break;
+      }
+      case 'rotate': {
+        const a = args[0] * Math.PI / 180;
+        const cos = Math.cos(a), sin = Math.sin(a);
+        if (args.length >= 3) {
+          const cx = args[1], cy = args[2];
+          t = matMul([1, 0, 0, 1, cx, cy], matMul([cos, sin, -sin, cos, 0, 0], [1, 0, 0, 1, -cx, -cy]));
+        } else {
+          t = [cos, sin, -sin, cos, 0, 0];
+        }
+        break;
+      }
+      default:
+        t = [1, 0, 0, 1, 0, 0];
+    }
+    mat = matMul(mat, t);
+  }
+  return mat;
+}
+
+function inheritedMat(el, root) {
+  const chain = [];
+  let cur = el;
+  while (cur && cur !== root) {
+    chain.push(cur);
+    cur = cur.parentNode;
+  }
+  let mat = [1, 0, 0, 1, 0, 0];
+  for (let i = chain.length - 1; i >= 0; i--) {
+    mat = matMul(mat, localMat(chain[i]));
+  }
+  return mat;
+}
+
+function applyMat(pts, m) {
+  return pts.map(p => ({
+    x: m[0] * p.x + m[2] * p.y + m[4],
+    y: m[1] * p.x + m[3] * p.y + m[5]
+  }));
+}
+
+// ══════════════════════════════════════════════════
+// 4. ELEMENT TO POLYLINES
+// ══════════════════════════════════════════════════
+
+function elToPolylines(el, svgEl, n) {
+  const tag = (el.tagName || '').replace(/.*:/, '').toLowerCase();
+  const mat = inheritedMat(el, svgEl);
+  const result = { polylines: [], closed: false };
+
+  function attr(name, def) {
+    const v = el.getAttribute(name);
+    return v !== null ? parseFloat(v) : (def || 0);
+  }
+
+  switch (tag) {
+    case 'path': {
+      const d = el.getAttribute('d');
+      if (!d) break;
+      const cmds = parsePathData(d);
+      let poly = [];
+      let hasClosed = false;
+      let cx = 0, cy = 0;
+
+      for (const c of cmds) {
+        switch (c.type) {
+          case 'M':
+            if (poly.length > 0) result.polylines.push(poly);
+            poly = [{ x: c.x, y: c.y }];
+            cx = c.x; cy = c.y;
+            break;
+          case 'L':
+            poly.push({ x: c.x, y: c.y });
+            cx = c.x; cy = c.y;
+            break;
+          case 'C':
+            poly.push(...cubicPts(cx, cy, c.x1, c.y1, c.x2, c.y2, c.x, c.y, n));
+            cx = c.x; cy = c.y;
+            break;
+          case 'Q':
+            poly.push(...quadPts(cx, cy, c.x1, c.y1, c.x, c.y, n));
+            cx = c.x; cy = c.y;
+            break;
+          case 'A':
+            poly.push(...arcPts(cx, cy, c.rx, c.ry, c.xRot, c.laf, c.sf, c.x, c.y, n));
+            cx = c.x; cy = c.y;
+            break;
+          case 'Z':
+            poly.push({ x: c.x, y: c.y });
+            hasClosed = true;
+            cx = c.x; cy = c.y;
+            break;
+        }
+      }
+      if (poly.length > 0) result.polylines.push(poly);
+      result.closed = hasClosed;
+      break;
+    }
+
+    case 'rect': {
+      const x = attr('x'), y = attr('y');
+      const w = attr('width'), h = attr('height');
+      let rx = attr('rx', 0), ry = attr('ry', 0);
+      if (rx === 0 && ry !== 0) rx = ry;
+      if (ry === 0 && rx !== 0) ry = rx;
+      rx = Math.min(rx, w / 2);
+      ry = Math.min(ry, h / 2);
+
+      if (rx === 0 && ry === 0) {
+        result.polylines.push([
+          { x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }, { x, y }
+        ]);
+      } else {
+        const segs = Math.max(2, Math.floor(n / 4));
+        const poly = [];
+        // Top-right corner
+        poly.push(...arcPts(x + w - rx, y, rx, ry, 0, 0, 1, x + w, y + ry, segs));
+        // Bottom-right corner
+        poly.push(...arcPts(x + w, y + h - ry, rx, ry, 0, 0, 1, x + w - rx, y + h, segs));
+        // Bottom-left corner
+        poly.push(...arcPts(x + rx, y + h, rx, ry, 0, 0, 1, x, y + h - ry, segs));
+        // Top-left corner
+        poly.push(...arcPts(x, y + ry, rx, ry, 0, 0, 1, x + rx, y, segs));
+        poly.push(poly[0]); // close
+        result.polylines.push(poly);
+      }
+      result.closed = true;
+      break;
+    }
+
+    case 'circle': {
+      const cx = attr('cx'), cy = attr('cy'), r = attr('r');
+      const poly = [];
+      for (let i = 0; i <= n; i++) {
+        const a = (2 * Math.PI * i) / n;
+        poly.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+      }
+      result.polylines.push(poly);
+      result.closed = true;
+      break;
+    }
+
+    case 'ellipse': {
+      const cx = attr('cx'), cy = attr('cy');
+      const rx = attr('rx'), ry = attr('ry');
+      const poly = [];
+      for (let i = 0; i <= n; i++) {
+        const a = (2 * Math.PI * i) / n;
+        poly.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
+      }
+      result.polylines.push(poly);
+      result.closed = true;
+      break;
+    }
+
+    case 'line': {
+      const x1 = attr('x1'), y1 = attr('y1');
+      const x2 = attr('x2'), y2 = attr('y2');
+      result.polylines.push([{ x: x1, y: y1 }, { x: x2, y: y2 }]);
+      result.closed = false;
+      break;
+    }
+
+    case 'polyline': {
+      const pts = parsePoints(el.getAttribute('points') || '');
+      if (pts.length) result.polylines.push(pts);
+      result.closed = false;
+      break;
+    }
+
+    case 'polygon': {
+      const pts = parsePoints(el.getAttribute('points') || '');
+      if (pts.length) {
+        pts.push({ x: pts[0].x, y: pts[0].y });
+        result.polylines.push(pts);
+      }
+      result.closed = true;
+      break;
+    }
+  }
+
+  // Apply transform to all polylines
+  result.polylines = result.polylines.map(pl => applyMat(pl, mat));
+  return result;
+}
+
+function parsePoints(s) {
+  const nums = s.match(/[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g);
+  if (!nums) return [];
+  const pts = [];
+  for (let i = 0; i + 1 < nums.length; i += 2) {
+    pts.push({ x: parseFloat(nums[i]), y: parseFloat(nums[i + 1]) });
+  }
+  return pts;
+}
+
+// ══════════════════════════════════════════════════
+// 5. HATCHING (SCANLINE FILL)
+// ══════════════════════════════════════════════════
+
+function segIsect(ax, ay, bx, by, cx, cy, dx, dy) {
+  const denom = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
+  if (Math.abs(denom) < 1e-12) return null;
+  const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / denom;
+  const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / denom;
+  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+    return ax + t * (bx - ax);
+  }
+  return null;
+}
+
+function generateHatch(polygons, spacing, angleDeg, bidir) {
+  const lines = [];
+  if (!polygons.length || spacing <= 0) return lines;
+
+  const rad = -angleDeg * Math.PI / 180;
+  const cosA = Math.cos(rad), sinA = Math.sin(rad);
+
+  // Rotate polygons
+  const rotPolys = polygons.map(poly =>
+    poly.map(p => ({ x: cosA * p.x - sinA * p.y, y: sinA * p.x + cosA * p.y }))
+  );
+
+  // Bounding box in rotated space
+  let minY = Infinity, maxY = -Infinity;
+  for (const poly of rotPolys) {
+    for (const p of poly) {
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+  }
+
+  // Inverse rotation
+  const cosB = Math.cos(-rad), sinB = Math.sin(-rad);
+
+  let li = 0;
+  for (let y = minY + spacing / 2; y < maxY; y += spacing, li++) {
+    // Find intersections with all polygon edges
+    const xs = [];
+    for (const poly of rotPolys) {
+      for (let i = 0; i < poly.length - 1; i++) {
+        const ix = segIsect(
+          poly[i].x, poly[i].y, poly[i + 1].x, poly[i + 1].y,
+          -1e9, y, 1e9, y
+        );
+        if (ix !== null) xs.push(ix);
+      }
+    }
+    xs.sort((a, b) => a - b);
+
+    // Pair up intersections
+    for (let j = 0; j + 1 < xs.length; j += 2) {
+      let x0 = xs[j], x1 = xs[j + 1];
+      if (bidir && li % 2 === 1) { const tmp = x0; x0 = x1; x1 = tmp; }
+      // Rotate back
+      lines.push([
+        { x: cosB * x0 - sinB * y, y: sinB * x0 + cosB * y },
+        { x: cosB * x1 - sinB * y, y: sinB * x1 + cosB * y }
+      ]);
+    }
+  }
+  return lines;
+}
+
+// ══════════════════════════════════════════════════
+// 6. SVG → PLT CONVERSION
+// ══════════════════════════════════════════════════
+
+function convertSVGtoPLT(svgText, opts) {
+  const HPU = 40; // HPGL units per mm
+
+  // Parse SVG
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgText, 'image/svg+xml');
+  const svgEl = doc.querySelector('svg');
+  if (!svgEl) throw new Error('Élément <svg> introuvable dans le fichier.');
+
+  // Detect text
+  const hasText = svgEl.querySelectorAll('text').length > 0;
+
+  // Get SVG dimensions
+  let vbW, vbH;
+  const vb = svgEl.getAttribute('viewBox');
+  if (vb) {
+    const parts = vb.split(/[\s,]+/).map(Number);
+    vbW = parts[2];
+    vbH = parts[3];
+  } else {
+    vbW = parseFloat(svgEl.getAttribute('width')) || 210;
+    vbH = parseFloat(svgEl.getAttribute('height')) || 297;
+  }
+
+  // Excluded containers
+  const excluded = new Set(['defs', 'style', 'script', 'mask', 'clippath', 'filter', 'symbol', 'metadata']);
+
+  function isExcluded(el) {
+    let cur = el.parentNode;
+    while (cur && cur !== svgEl) {
+      const t = (cur.tagName || '').replace(/.*:/, '').toLowerCase();
+      if (excluded.has(t)) return true;
+      cur = cur.parentNode;
+    }
+    return false;
+  }
+
+  // Collect graphical elements
+  const supported = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
+  const elements = [];
+  const allDescs = svgEl.querySelectorAll('*');
+  for (const el of allDescs) {
+    const tag = (el.tagName || '').replace(/.*:/, '').toLowerCase();
+    if (supported.has(tag) && !isExcluded(el)) {
+      const data = elToPolylines(el, svgEl, opts.curveRes);
+      if (data.polylines.length) elements.push(data);
+    }
+  }
+
+  // Global bounding box
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const elem of elements) {
+    for (const pl of elem.polylines) {
+      for (const p of pl) {
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+    }
+  }
+
+  if (!isFinite(minX)) {
+    return { pltStr: 'SP1;\n', hasText, cmdCount: 0, distMM: 0, elemCount: 0, hatchLineCount: 0 };
+  }
+
+  const bbW = maxX - minX || 1;
+  const bbH = maxY - minY || 1;
+
+  // Scale calculation
+  const pageWmm = opts.pageW;
+  const pageHmm = opts.pageH;
+  const marginMM = opts.margin;
+  const usableW = (pageWmm - 2 * marginMM);
+  const usableH = (pageHmm - 2 * marginMM);
+
+  let scale;
+  if (opts.fitPage) {
+    const fitScale = Math.min(usableW / bbW, usableH / bbH);
+    scale = fitScale * HPU;
+  } else {
+    scale = HPU;
+  }
+
+  const marginH = marginMM * HPU;
+
+  // Coordinate transform
+  function toH(pt) {
+    const x = (pt.x - minX) * scale + marginH;
+    const y = (maxY - pt.y) * scale + marginH; // invert Y
+    return { x: Math.round(x), y: Math.round(y) };
+  }
+
+  // Generate HPGL
+  let hpgl = 'SP1;\n';
+  let cmdCount = 0;
+  let totalDist = 0;
+  let hatchLineCount = 0;
+  let lastX = 0, lastY = 0;
+
+  function moveTo(p) {
+    hpgl += `PU${p.x},${p.y};\n`;
+    cmdCount++;
+    lastX = p.x; lastY = p.y;
+  }
+
+  function drawTo(p) {
+    const dx = p.x - lastX, dy = p.y - lastY;
+    totalDist += Math.sqrt(dx * dx + dy * dy);
+    hpgl += `PD${p.x},${p.y};\n`;
+    cmdCount++;
+    lastX = p.x; lastY = p.y;
+  }
+
+  for (const elem of elements) {
+    // Draw contours
+    if (!opts.hatchEnable || opts.hatchContoursAlso) {
+      for (const pl of elem.polylines) {
+        if (pl.length < 2) continue;
+        moveTo(toH(pl[0]));
+        for (let i = 1; i < pl.length; i++) {
+          drawTo(toH(pl[i]));
+        }
+      }
+    }
+
+    // Hatch closed shapes
+    if (opts.hatchEnable && elem.closed) {
+      const spacingSvg = opts.hatchSpacing / (scale / HPU);
+
+      const angles = [opts.hatchAngle];
+      if (opts.hatchType === 'cross') {
+        angles.push((opts.hatchAngle + 90) % 180);
+      }
+
+      for (const angle of angles) {
+        const hatchLines = generateHatch(elem.polylines, spacingSvg, angle, opts.hatchBidirectional);
+        hatchLineCount += hatchLines.length;
+        for (const line of hatchLines) {
+          moveTo(toH(line[0]));
+          drawTo(toH(line[1]));
+        }
+      }
+    }
+  }
+
+  // Distance in mm
+  const distMM = totalDist / HPU;
+
+  return {
+    pltStr: hpgl,
+    hasText,
+    cmdCount,
+    distMM: Math.round(distMM * 10) / 10,
+    elemCount: elements.length,
+    hatchLineCount
+  };
+}
+
+// ══════════════════════════════════════════════════
+// 7. HATCH PREVIEW
+// ══════════════════════════════════════════════════
+
+function updateHatchPreview() {
+  const svg = $('hatchPreviewSvg');
+  // Remove existing lines
+  while (svg.childNodes.length > 1) svg.removeChild(svg.lastChild);
+  // Keep the rect
+  const rect = svg.querySelector('rect');
+
+  const spacing = parseFloat(hatchSpacing.value) * 9; // scale to preview
+  const angle = parseFloat(hatchAngle.value);
+  const type = $('hatchType').value;
+
+  const polygon = [
+    { x: 20, y: 8 }, { x: 180, y: 8 }, { x: 180, y: 68 }, { x: 20, y: 68 }, { x: 20, y: 8 }
+  ];
+
+  const angles = [angle];
+  if (type === 'cross') angles.push((angle + 90) % 180);
+
+  for (const a of angles) {
+    const lines = generateHatch([polygon], spacing, a, false);
+    for (const line of lines) {
+      const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      l.setAttribute('x1', line[0].x);
+      l.setAttribute('y1', line[0].y);
+      l.setAttribute('x2', line[1].x);
+      l.setAttribute('y2', line[1].y);
+      l.setAttribute('stroke', 'var(--accent)');
+      l.setAttribute('stroke-width', '0.8');
+      l.setAttribute('opacity', '0.6');
+      svg.appendChild(l);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════
+// 8. PRESETS
+// ══════════════════════════════════════════════════
+
+const presetFields = {
+  numbers: ['pageW', 'pageH', 'margin'],
+  ranges: ['curveRes', 'hatchSpacing', 'hatchAngle'],
+  checks: ['fitPage', 'hatchEnable', 'hatchContoursAlso', 'hatchBidirectional'],
+  selects: ['pageFormat', 'hatchType']
+};
+
+function gatherSettings() {
+  const s = {};
+  for (const id of presetFields.numbers) s[id] = parseFloat($(id).value);
+  for (const id of presetFields.ranges) s[id] = parseFloat($(id).value);
+  for (const id of presetFields.checks) s[id] = $(id).checked;
+  for (const id of presetFields.selects) s[id] = $(id).value;
+  return s;
+}
+
+function applySettings(s) {
+  for (const id of presetFields.numbers) if (s[id] !== undefined) $(id).value = s[id];
+  for (const id of presetFields.ranges) if (s[id] !== undefined) $(id).value = s[id];
+  for (const id of presetFields.checks) if (s[id] !== undefined) $(id).checked = s[id];
+  for (const id of presetFields.selects) if (s[id] !== undefined) $(id).value = s[id];
+
+  // Update displays
+  curveResVal.textContent = curveRes.value;
+  hatchSpacingVal.textContent = hatchSpacing.value;
+  hatchAngleVal.textContent = hatchAngle.value + '°';
+  hatchPanel.classList.toggle('hatch-disabled', !hatchEnable.checked);
+  updateHatchPreview();
+}
+
+function downloadPreset(name, settings) {
+  const data = {
+    name,
+    version: 1,
+    created: new Date().toISOString(),
+    settings
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+
+  if (window.showSaveFilePicker) {
+    window.showSaveFilePicker({
+      suggestedName: name.replace(/\s+/g, '_') + '.json',
+      types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+    }).then(async handle => {
+      const w = await handle.createWritable();
+      await w.write(blob);
+      await w.close();
+    }).catch(() => fallbackDownload(blob, name.replace(/\s+/g, '_') + '.json'));
+  } else {
+    fallbackDownload(blob, name.replace(/\s+/g, '_') + '.json');
+  }
+}
+
+function loadPresetFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (data.settings) applySettings(data.settings);
+    } catch (e) {
+      showError('Fichier preset invalide : ' + e.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ══════════════════════════════════════════════════
+// 9. FILE HANDLING
+// ══════════════════════════════════════════════════
+
+function loadFile(file) {
+  if (!file.name.toLowerCase().endsWith('.svg')) {
+    showError('Veuillez sélectionner un fichier .SVG');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    showError('Attention : le fichier dépasse 5 Mo. La conversion pourrait être lente.');
+  }
+  svgBaseName = file.name.replace(/\.svg$/i, '');
+  const reader = new FileReader();
+  reader.onload = () => {
+    svgContent = reader.result;
+    fileName.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} Ko)`;
+    fileInfo.classList.add('visible');
+    btnConvert.disabled = false;
+    placeholder.classList.add('hidden');
+
+    // Show SVG preview
+    svgPreview.innerHTML = svgContent;
+    svgPreview.classList.add('visible');
+  };
+  reader.readAsText(file);
+}
+
+function resetOutput() {
+  alertText.classList.remove('visible');
+  alertHatch.classList.remove('visible');
+  alertSuccess.classList.remove('visible');
+  alertError.classList.remove('visible');
+  pltPreview.classList.remove('visible');
+  pltCanvas.classList.remove('visible');
+  pltViewToggle.classList.remove('visible');
+  statsBar.classList.remove('visible');
+  btnDownload.classList.remove('visible');
+}
+
+function showError(msg) {
+  alertError.textContent = msg;
+  alertError.classList.add('visible');
+}
+
+function fallbackDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════════════
+// 9b. PLT CANVAS RENDERER
+// ══════════════════════════════════════════════════
+
+function renderPltCanvas(pltStr) {
+  const cmdRe = /(PU|PD)(\d+),(\d+);/g;
+  const moves = [];
+  let m;
+  while ((m = cmdRe.exec(pltStr)) !== null) {
+    moves.push({ type: m[1], x: parseInt(m[2]), y: parseInt(m[3]) });
+  }
+  if (!moves.length) return;
+
+  // Bounding box
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const mv of moves) {
+    if (mv.x < minX) minX = mv.x;
+    if (mv.y < minY) minY = mv.y;
+    if (mv.x > maxX) maxX = mv.x;
+    if (mv.y > maxY) maxY = mv.y;
+  }
+
+  const bbW = maxX - minX || 1;
+  const bbH = maxY - minY || 1;
+  const pad = 20;
+
+  // Adjust canvas size to aspect ratio
+  const aspect = bbW / bbH;
+  const canvasW = 800;
+  const canvasH = Math.round(canvasW / aspect);
+  pltCanvas.width = canvasW;
+  pltCanvas.height = Math.max(200, Math.min(canvasH, 600));
+
+  const scaleX = (pltCanvas.width - 2 * pad) / bbW;
+  const scaleY = (pltCanvas.height - 2 * pad) / bbH;
+  const scale = Math.min(scaleX, scaleY);
+  const offX = pad + (pltCanvas.width - 2 * pad - bbW * scale) / 2;
+  const offY = pad + (pltCanvas.height - 2 * pad - bbH * scale) / 2;
+
+  function tx(x) { return offX + (x - minX) * scale; }
+  function ty(y) { return offY + (maxY - y) * scale; } // invert Y for canvas
+
+  const ctx = pltCanvas.getContext('2d');
+  ctx.clearRect(0, 0, pltCanvas.width, pltCanvas.height);
+
+  let prevX = 0, prevY = 0;
+  for (const mv of moves) {
+    const cx = tx(mv.x), cy = ty(mv.y);
+    if (mv.type === 'PU') {
+      // Move: light dashed blue line
+      ctx.beginPath();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(42, 108, 182, 0.25)';
+      ctx.lineWidth = 0.5;
+      ctx.moveTo(prevX, prevY);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+    } else {
+      // Draw: solid orange line
+      ctx.beginPath();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#c44b1a';
+      ctx.lineWidth = 1.5;
+      ctx.moveTo(prevX, prevY);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+    }
+    prevX = cx;
+    prevY = cy;
+  }
+}
+
+// ══════════════════════════════════════════════════
+// 10. EVENT LISTENERS
+// ══════════════════════════════════════════════════
+
+// File input
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+// Drag & drop
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+
+// Page format
+pageFormat.addEventListener('change', () => {
+  const formats = { a4: [210, 297], a3: [297, 420], a2: [420, 594], letter: [216, 279] };
+  const f = formats[pageFormat.value];
+  if (f) {
+    $('pageW').value = f[0];
+    $('pageH').value = f[1];
+  }
+});
+
+// Range sliders
+curveRes.addEventListener('input', () => curveResVal.textContent = curveRes.value);
+hatchSpacing.addEventListener('input', () => { hatchSpacingVal.textContent = hatchSpacing.value; updateHatchPreview(); });
+hatchAngle.addEventListener('input', () => { hatchAngleVal.textContent = hatchAngle.value + '°'; updateHatchPreview(); });
+$('hatchType').addEventListener('change', () => updateHatchPreview());
+
+// Hatch enable toggle
+hatchEnable.addEventListener('change', () => {
+  hatchPanel.classList.toggle('hatch-disabled', !hatchEnable.checked);
+});
+
+// Convert
+btnConvert.addEventListener('click', () => {
+  resetOutput();
+
+  const pageW = parseFloat($('pageW').value);
+  const pageH = parseFloat($('pageH').value);
+  const marginVal = parseFloat($('margin').value);
+
+  if (!pageW || pageW <= 0 || !pageH || pageH <= 0) {
+    showError('Les dimensions de la page doivent être supérieures à 0.');
+    return;
+  }
+  if (isNaN(marginVal) || marginVal < 0) {
+    showError('La marge doit être un nombre positif ou nul.');
+    return;
+  }
+
+  const opts = {
+    pageW: pageW || 210,
+    pageH: pageH || 297,
+    margin: marginVal || 5,
+    curveRes: parseInt(curveRes.value) || 32,
+    fitPage: $('fitPage').checked,
+    hatchEnable: hatchEnable.checked,
+    hatchType: $('hatchType').value,
+    hatchSpacing: parseFloat(hatchSpacing.value) || 0.5,
+    hatchAngle: parseFloat(hatchAngle.value) || 45,
+    hatchBidirectional: $('hatchBidirectional').checked,
+    hatchContoursAlso: $('hatchContoursAlso').checked
+  };
+
+  // Loading state
+  btnConvert.textContent = 'CONVERSION…';
+  btnConvert.classList.add('loading');
+
+  setTimeout(() => {
+    try {
+      pltResult = convertSVGtoPLT(svgContent, opts);
+
+      // Warnings
+      if (pltResult.hasText) {
+        alertText.textContent = 'Le fichier contient des éléments <text> qui ne seront pas convertis. Convertissez-les en chemins dans votre éditeur SVG.';
+        alertText.classList.add('visible');
+      }
+      if (pltResult.hatchLineCount > 0) {
+        alertHatch.textContent = `${pltResult.hatchLineCount} lignes de hachures générées. Vérifiez le résultat avant gravure.`;
+        alertHatch.classList.add('visible');
+      }
+
+      // Success
+      alertSuccess.textContent = `Conversion réussie — ${pltResult.cmdCount} commandes HPGL générées.`;
+      alertSuccess.classList.add('visible');
+
+      // Stats
+      $('statCmds').textContent = pltResult.cmdCount.toLocaleString('fr-FR');
+      $('statDist').textContent = pltResult.distMM.toLocaleString('fr-FR') + ' mm';
+      $('statElems').textContent = pltResult.elemCount;
+      $('statHatch').textContent = pltResult.hatchLineCount;
+      $('statSize').textContent = (pltResult.pltStr.length / 1024).toFixed(1) + ' Ko';
+      statsBar.classList.add('visible');
+
+      // Canvas preview
+      renderPltCanvas(pltResult.pltStr);
+      pltCanvas.classList.toggle('visible', pltViewMode === 'canvas');
+
+      // PLT text preview with syntax highlighting
+      let display = pltResult.pltStr;
+      if (display.length > 5000) display = display.substring(0, 5000) + '\n… (tronqué à 5000 caractères)';
+
+      display = display
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/(IN;|SP\d+;|VS\d+;)/g, '<span class="cmd-init">$1</span>')
+        .replace(/(PU[^;]*;)/g, '<span class="cmd-move">$1</span>')
+        .replace(/(PD[^;]*;)/g, '<span class="cmd-draw">$1</span>');
+
+      pltCode.innerHTML = display;
+      pltCode.style.display = pltViewMode === 'text' ? '' : 'none';
+      pltViewToggle.classList.add('visible');
+      pltPreview.classList.add('visible');
+
+      // Download button
+      btnDownload.classList.add('visible');
+
+    } catch (e) {
+      if (e.message.includes('introuvable')) {
+        showError('Le fichier ne contient pas de SVG valide. Vérifiez qu\'il s\'agit bien d\'un fichier .svg.');
+      } else {
+        showError('Erreur de conversion : ' + e.message);
+      }
+    } finally {
+      btnConvert.textContent = 'CONVERTIR EN PLT';
+      btnConvert.classList.remove('loading');
+    }
+  }, 20);
+});
+
+// Download PLT
+btnDownload.addEventListener('click', () => {
+  if (!pltResult) return;
+  const blob = new Blob([pltResult.pltStr], { type: 'application/octet-stream' });
+  const outName = svgBaseName + '.plt';
+
+  if (window.showSaveFilePicker) {
+    window.showSaveFilePicker({
+      suggestedName: outName,
+      types: [{ description: 'PLT file', accept: { 'application/octet-stream': ['.plt'] } }]
+    }).then(async handle => {
+      const w = await handle.createWritable();
+      await w.write(blob);
+      await w.close();
+    }).catch(() => fallbackDownload(blob, outName));
+  } else {
+    fallbackDownload(blob, outName);
+  }
+});
+
+// Presets
+$('btnSavePreset').addEventListener('click', () => {
+  presetName.value = '';
+  modalOverlay.classList.add('visible');
+  presetName.focus();
+});
+
+$('modalCancel').addEventListener('click', () => modalOverlay.classList.remove('visible'));
+
+$('modalConfirm').addEventListener('click', () => {
+  const name = presetName.value.trim() || 'preset';
+  downloadPreset(name, gatherSettings());
+  modalOverlay.classList.remove('visible');
+});
+
+modalOverlay.addEventListener('click', e => {
+  if (e.target === modalOverlay) modalOverlay.classList.remove('visible');
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && modalOverlay.classList.contains('visible')) {
+    modalOverlay.classList.remove('visible');
+  }
+});
+
+$('btnLoadPreset').addEventListener('click', () => $('presetFileInput').click());
+$('presetFileInput').addEventListener('change', e => {
+  if (e.target.files[0]) loadPresetFromFile(e.target.files[0]);
+  e.target.value = '';
+});
+
+// PLT view toggle
+pltViewToggle.addEventListener('click', e => {
+  const btn = e.target.closest('.toggle-btn');
+  if (!btn) return;
+  pltViewMode = btn.dataset.view;
+  pltViewToggle.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  pltCanvas.classList.toggle('visible', pltViewMode === 'canvas');
+  pltCode.style.display = pltViewMode === 'text' ? '' : 'none';
+});
+
+// Tooltips
+function showTooltipFor(btn) {
+  const data = btn.getAttribute('data-tooltip');
+  if (!data) return;
+  const [title, body] = data.split('|||');
+  tooltip.querySelector('.tt-title').textContent = title;
+  tooltip.querySelector('.tt-body').innerHTML = body;
+
+  const rect = btn.getBoundingClientRect();
+  const sidebar = document.querySelector('.sidebar');
+  const sidebarRight = sidebar.getBoundingClientRect().right;
+  tooltip.classList.add('visible');
+
+  // Position: right of sidebar on desktop, below button on mobile
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    tooltip.style.left = Math.max(10, rect.left) + 'px';
+    tooltip.style.top = (rect.bottom + 8) + 'px';
+  } else {
+    let top = rect.top - 8;
+    const ttH = tooltip.offsetHeight;
+    if (top + ttH > window.innerHeight - 10) top = window.innerHeight - ttH - 10;
+    if (top < 10) top = 10;
+    tooltip.style.left = (sidebarRight + 10) + 'px';
+    tooltip.style.top = top + 'px';
+  }
+}
+
+function hideTooltip() {
+  tooltip.classList.remove('visible');
+}
+
+document.addEventListener('mouseover', e => {
+  const btn = e.target.closest('.info-btn');
+  if (btn) showTooltipFor(btn);
+});
+
+document.addEventListener('mouseout', e => {
+  const btn = e.target.closest('.info-btn');
+  if (btn) hideTooltip();
+});
+
+document.addEventListener('focusin', e => {
+  const btn = e.target.closest('.info-btn');
+  if (btn) showTooltipFor(btn);
+});
+
+document.addEventListener('focusout', e => {
+  const btn = e.target.closest('.info-btn');
+  if (btn) hideTooltip();
+});
+
+// Init hatch preview
+updateHatchPreview();
+
+</script>
+</body>
+</html>
