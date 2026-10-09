@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="Convertisseur SVG vers PLT (HPGL) pour graveurs laser et traceurs. 100% local, aucun envoi de données.">
+<meta name="description" content="Convertisseur SVG et DXF vers PLT (HPGL) pour graveurs laser et traceurs. 100% local, aucun envoi de données.">
 <meta name="color-scheme" content="light dark">
-<title>Laserplot — SVG vers PLT</title>
+<title>Laserplot — SVG & DXF vers PLT</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23000'/%3E%3Cpath d='M16 8v16M8 16h16' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='16' r='5' fill='none' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -953,7 +953,7 @@ dialog.sheet form { display: grid; gap: 24px; }
       <span class="brand-name">Laserplot</span>
     </a>
     <span class="sep hide-sm" aria-hidden="true"></span>
-    <span class="topbar-file hide-sm" id="topbarFile">SVG → PLT · HPGL</span>
+    <span class="topbar-file hide-sm" id="topbarFile">SVG / DXF → PLT · HPGL</span>
     <span class="topbar-spacer"></span>
     <span class="badge hide-md" title="Aucun fichier n'est envoyé sur un serveur"><i data-icon="shield"></i>100% local</span>
     <button class="icon-btn hide-sm" id="btnShortcuts" type="button" aria-label="Raccourcis clavier" title="Raccourcis clavier (?)"><i data-icon="keyboard"></i></button>
@@ -969,12 +969,12 @@ dialog.sheet form { display: grid; gap: 24px; }
   <!-- ── SIDEBAR ── -->
   <aside class="sidebar" aria-label="Paramètres">
     <div class="sidebar-scroll">
-      <input type="file" id="fileInput" accept=".svg,image/svg+xml" hidden>
+      <input type="file" id="fileInput" accept=".svg,.dxf,image/svg+xml,image/vnd.dxf,application/dxf" hidden>
       <input type="file" id="presetInput" accept=".json,application/json" hidden>
 
       <button class="file-empty" id="fileEmpty" type="button">
         <span class="file-icon"><i data-icon="upload"></i></span>
-        <span><b>Importer un SVG</b><span>Glisser-déposer ou cliquer pour parcourir</span></span>
+        <span><b>Importer un SVG ou DXF</b><span>Glisser-déposer ou cliquer pour parcourir</span></span>
       </button>
       <div class="file-card" id="fileCard" hidden>
         <span class="file-icon"><img id="fileThumb" alt=""></span>
@@ -1040,7 +1040,7 @@ dialog.sheet form { display: grid; gap: 24px; }
           <div class="section-body">
             <div class="field">
               <span class="field-label">Échelle
-                <button type="button" class="tip-btn" data-tip="Ajuster : remplit la zone utile en conservant les proportions. Réelle : respecte les dimensions physiques du SVG (width/height). Personnalisée : pourcentage de la taille réelle." aria-label="Aide : échelle"><i data-icon="info"></i></button>
+                <button type="button" class="tip-btn" data-tip="Ajuster : remplit la zone utile en conservant les proportions. Réelle : respecte les dimensions physiques du fichier (width/height du SVG, unités $INSUNITS du DXF). Personnalisée : pourcentage de la taille réelle." aria-label="Aide : échelle"><i data-icon="info"></i></button>
               </span>
               <div class="segmented" role="radiogroup" aria-label="Échelle">
                 <label><input type="radio" name="scaleMode" value="fit" checked><span>Ajuster</span></label>
@@ -1179,7 +1179,7 @@ dialog.sheet form { display: grid; gap: 24px; }
       <div class="tabs" role="tablist" aria-label="Vues">
         <button class="tab" role="tab" id="tab-preview" aria-controls="panel-preview" aria-selected="true" data-tab="preview">Aperçu</button>
         <button class="tab" role="tab" id="tab-code" aria-controls="panel-code" aria-selected="false" data-tab="code" tabindex="-1">Code HPGL</button>
-        <button class="tab" role="tab" id="tab-source" aria-controls="panel-source" aria-selected="false" data-tab="source" tabindex="-1">SVG source</button>
+        <button class="tab" role="tab" id="tab-source" aria-controls="panel-source" aria-selected="false" data-tab="source" tabindex="-1">Source</button>
       </div>
       <div class="toolbar-group" id="tools-preview">
         <button class="icon-btn" type="button" id="btnSim" aria-pressed="false" aria-label="Simulation du tracé" title="Simulation du tracé"><i data-icon="play"></i></button>
@@ -1216,10 +1216,10 @@ dialog.sheet form { display: grid; gap: 24px; }
         <div class="skeleton-layer" aria-hidden="true"><div class="skel skel-page"></div></div>
 
         <div class="empty" id="empty">
-          <div class="empty-card" id="emptyCard" role="button" tabindex="0" aria-label="Importer un fichier SVG">
+          <div class="empty-card" id="emptyCard" role="button" tabindex="0" aria-label="Importer un fichier SVG ou DXF">
             <span class="empty-icon"><i data-icon="upload"></i></span>
-            <h2>Déposez un fichier SVG</h2>
-            <p>Convertissez vos dessins vectoriels en PLT (HPGL) prêts pour votre graveur laser ou traceur.</p>
+            <h2>Déposez un fichier SVG ou DXF</h2>
+            <p>Convertissez vos dessins vectoriels (Illustrator, Inkscape, AutoCAD, Fusion…) en PLT (HPGL) prêts pour votre graveur laser ou traceur.</p>
             <div class="empty-actions">
               <button class="btn btn-primary" type="button" id="btnBrowse">Parcourir</button>
               <button class="btn btn-secondary" type="button" id="btnSample"><i data-icon="shapes"></i>Essayer un exemple</button>
@@ -1235,7 +1235,7 @@ dialog.sheet form { display: grid; gap: 24px; }
       </div>
 
       <div class="panel source-panel" id="panel-source" role="tabpanel" aria-labelledby="tab-source" hidden>
-        <div class="source-frame"><img id="sourceImg" alt="Aperçu du fichier SVG source"></div>
+        <div class="source-frame"><img id="sourceImg" alt="Aperçu du fichier source"></div>
       </div>
     </div>
 
@@ -1257,7 +1257,7 @@ dialog.sheet form { display: grid; gap: 24px; }
   <div class="drop-overlay-inner">
     <span class="empty-icon"><i data-icon="upload"></i></span>
     <h2>Déposez pour importer</h2>
-    <p>Fichier .svg uniquement</p>
+    <p>Fichiers .svg et .dxf</p>
   </div>
 </div>
 
@@ -1282,7 +1282,7 @@ dialog.sheet form { display: grid; gap: 24px; }
   <form method="dialog">
     <h3 id="shortcutsTitle">Raccourcis clavier</h3>
     <div class="shortcuts">
-      <div><span>Importer un SVG</span><span><kbd>Ctrl</kbd> <kbd>O</kbd></span></div>
+      <div><span>Importer un SVG / DXF</span><span><kbd>Ctrl</kbd> <kbd>O</kbd></span></div>
       <div><span>Télécharger le PLT</span><span><kbd>Ctrl</kbd> <kbd>S</kbd></span></div>
       <div><span>Ajuster la vue</span><kbd>F</kbd></div>
       <div><span>Zoom avant / arrière</span><span><kbd>+</kbd> <kbd>−</kbd></span></div>
@@ -1300,7 +1300,7 @@ dialog.sheet form { display: grid; gap: 24px; }
 <script>
 'use strict';
 /* ═══════════════════════════════════════════════
-   LASERPLOT — SVG → PLT (HPGL) Converter
+   LASERPLOT — SVG / DXF → PLT (HPGL) Converter
    ═══════════════════════════════════════════════ */
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -1683,12 +1683,14 @@ function analyzeSvg(text) {
   const idMap = new Map();
   for (const el of svg.querySelectorAll('[id]')) idMap.set(el.getAttribute('id'), el);
 
-  return {
-    svg, idMap, unitMM, docW, docH,
+  const info = {
+    kind: 'svg', svg, idMap, unitMM, docW, docH,
     textCount: count('text'),
     imageCount: count('image'),
-    hasPhysicalSize: !!(wMM || hMM)
+    hasPhysicalSize: !!(wMM || hMM),
+    extract: n => extractGeometry(info, n)
   };
+  return info;
 }
 
 const SKIP_TAGS = new Set(['defs', 'style', 'script', 'mask', 'clippath', 'filter', 'symbol', 'metadata',
@@ -1848,6 +1850,410 @@ function extractGeometry(info, n) {
 
   walk(info.svg, IDENTITY, 0);
   return shapes;
+}
+
+/* ═══════════════════════════════════════════════
+   4b. DXF IMPORT (ASCII, R12 → 2018)
+   ═══════════════════════════════════════════════ */
+
+const DXF_UNITS_MM = { 1: 25.4, 2: 304.8, 4: 1, 5: 10, 6: 1000, 8: 25.4e-6, 9: 0.0254, 10: 914.4, 14: 100, 15: 10000 };
+const dxfVal = (e, code, def) => { for (const p of e.g) if (p[0] === code) return p[1]; return def; };
+const dxfNum = (e, code, def = 0) => { const v = parseFloat(dxfVal(e, code)); return isFinite(v) ? v : def; };
+
+function parseDxf(text) {
+  if (/^AutoCAD Binary DXF/.test(text)) {
+    throw new Error('DXF binaire non pris en charge : enregistrez le fichier au format DXF ASCII.');
+  }
+  const lines = text.split(/\r\n|\r|\n/);
+  const pairs = [];
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const raw = lines[i].trim();
+    if (raw === '' && i >= lines.length - 2) break;
+    const code = parseInt(raw, 10);
+    if (isNaN(code)) throw new Error('Fichier DXF illisible (structure de groupes invalide).');
+    pairs.push([code, lines[i + 1].trim()]);
+  }
+  if (!pairs.some(p => p[0] === 0 && p[1] === 'SECTION')) throw new Error('Ce fichier ne semble pas être un DXF valide.');
+
+  const header = {}, layers = new Map(), blocks = new Map();
+  let entities = [];
+  let i = 0;
+  const isEnd = () => pairs[i][0] === 0 && pairs[i][1] === 'ENDSEC';
+  const readEntities = () => {
+    const list = [];
+    while (i < pairs.length && !isEnd()) {
+      if (pairs[i][0] !== 0) { i++; continue; }
+      const ent = { type: pairs[i][1], g: [] };
+      i++;
+      while (i < pairs.length && pairs[i][0] !== 0) ent.g.push(pairs[i++]);
+      list.push(ent);
+    }
+    return list;
+  };
+
+  while (i < pairs.length) {
+    if (!(pairs[i][0] === 0 && pairs[i][1] === 'SECTION')) { i++; continue; }
+    const name = pairs[i + 1] && pairs[i + 1][1];
+    i += 2;
+    if (name === 'HEADER') {
+      while (i < pairs.length && !isEnd()) {
+        if (pairs[i][0] === 9) {
+          const key = pairs[i++][1];
+          if (i < pairs.length && pairs[i][0] !== 9 && pairs[i][0] !== 0) header[key] = pairs[i][1];
+        } else i++;
+      }
+    } else if (name === 'TABLES') {
+      for (const e of readEntities()) {
+        if (e.type === 'LAYER') layers.set(dxfVal(e, 2, ''), { flags: dxfNum(e, 70), color: dxfNum(e, 62, 7) });
+      }
+    } else if (name === 'BLOCKS') {
+      let cur = null;
+      for (const e of readEntities()) {
+        if (e.type === 'BLOCK') {
+          cur = { name: dxfVal(e, 2, ''), bx: dxfNum(e, 10), by: dxfNum(e, 20), ents: [] };
+          blocks.set(cur.name, cur);
+        } else if (e.type === 'ENDBLK') cur = null;
+        else if (cur) cur.ents.push(e);
+      }
+    } else if (name === 'ENTITIES') {
+      entities = readEntities();
+    } else {
+      while (i < pairs.length && !isEnd()) i++;
+    }
+  }
+  return { header, layers, blocks, entities };
+}
+
+// Polyline vertices with bulges → points (DXF space, Y up)
+function bulgePoly(verts, closed, n) {
+  const pts = [{ x: verts[0].x, y: verts[0].y }];
+  const count = closed ? verts.length : verts.length - 1;
+  for (let k = 0; k < count; k++) {
+    const a = verts[k], b = verts[(k + 1) % verts.length];
+    const bulge = a.b || 0;
+    const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+    if (Math.abs(bulge) < 1e-9 || d < 1e-12) { pts.push({ x: b.x, y: b.y }); continue; }
+    const theta = 4 * Math.atan(bulge);              // signed sweep, CCW > 0
+    const h = (d / 2) / Math.tan(theta / 2);         // signed distance chord → centre
+    const cx = (a.x + b.x) / 2 - dy / d * h, cy = (a.y + b.y) / 2 + dx / d * h;
+    const r = Math.hypot(a.x - cx, a.y - cy);
+    const a0 = Math.atan2(a.y - cy, a.x - cx);
+    const segs = Math.max(2, Math.ceil(n * Math.abs(theta) / (Math.PI / 2)));
+    for (let s = 1; s < segs; s++) {
+      const t = a0 + theta * s / segs;
+      pts.push({ x: cx + r * Math.cos(t), y: cy + r * Math.sin(t) });
+    }
+    pts.push({ x: b.x, y: b.y });
+  }
+  return pts;
+}
+
+function arcPolyline(cx, cy, rx, ry, a0, sweep, n, rot = 0) {
+  const segs = Math.max(4, Math.ceil(n * Math.abs(sweep) / (Math.PI / 2)));
+  const c = Math.cos(rot), s = Math.sin(rot);
+  const pts = [];
+  for (let k = 0; k <= segs; k++) {
+    const t = a0 + sweep * k / segs;
+    const px = rx * Math.cos(t), py = ry * Math.sin(t);
+    pts.push({ x: cx + c * px - s * py, y: cy + s * px + c * py });
+  }
+  return pts;
+}
+
+// Rational B-spline evaluation (de Boor)
+function splinePoints(deg, knots, ctrl, weights, n) {
+  const nc = ctrl.length;
+  if (nc < 2) return ctrl.slice();
+  deg = Math.max(1, Math.min(deg, nc - 1));
+  if (knots.length !== nc + deg + 1) {
+    knots = [];
+    for (let k = 0; k < nc + deg + 1; k++) knots.push(k <= deg ? 0 : k >= nc ? nc - deg : k - deg);
+  }
+  const w = weights.length === nc ? weights : ctrl.map(() => 1);
+  const t0 = knots[deg], t1 = knots[nc];
+  const segs = Math.min(20000, Math.max(8, n * (nc - deg)));
+  const pts = [];
+  for (let q = 0; q <= segs; q++) {
+    const t = t0 + (t1 - t0) * q / segs;
+    let k = deg;
+    while (k < nc - 1 && knots[k + 1] <= t) k++;
+    const d = [];
+    for (let j = 0; j <= deg; j++) {
+      const P = ctrl[j + k - deg], wj = w[j + k - deg];
+      d.push({ x: P.x * wj, y: P.y * wj, w: wj });
+    }
+    for (let r = 1; r <= deg; r++) {
+      for (let j = deg; j >= r; j--) {
+        const ii = j + k - deg;
+        const den = knots[ii + deg - r + 1] - knots[ii];
+        const al = den ? (t - knots[ii]) / den : 0;
+        d[j] = {
+          x: (1 - al) * d[j - 1].x + al * d[j].x,
+          y: (1 - al) * d[j - 1].y + al * d[j].y,
+          w: (1 - al) * d[j - 1].w + al * d[j].w
+        };
+      }
+    }
+    const P = d[deg];
+    if (P.w) pts.push({ x: P.x / P.w, y: P.y / P.w });
+  }
+  return pts;
+}
+
+// Smooth curve through fit points (Catmull-Rom), used when a SPLINE has no control points
+function fitCurve(fit, n, closed) {
+  const m = fit.length;
+  if (m < 3) return fit.slice();
+  const at = i => closed ? fit[(i + m) % m] : fit[Math.max(0, Math.min(m - 1, i))];
+  const segsPer = Math.max(4, Math.round(n / 2));
+  const pts = [{ ...fit[0] }];
+  const last = closed ? m : m - 1;
+  for (let i = 0; i < last; i++) {
+    const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
+    for (let k = 1; k <= segsPer; k++) {
+      const t = k / segsPer, t2 = t * t, t3 = t2 * t;
+      pts.push({
+        x: 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+        y: 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
+      });
+    }
+  }
+  return pts;
+}
+
+// Join open polylines whose endpoints touch (typical of exploded CAD drawings)
+function joinChains(polys, tol) {
+  const key = p => Math.round(p.x / tol) + ':' + Math.round(p.y / tol);
+  const index = new Map();
+  const add = (k, v) => { let b = index.get(k); if (!b) index.set(k, b = []); b.push(v); };
+  polys.forEach((pl, idx) => { add(key(pl[0]), [idx, 0]); add(key(pl[pl.length - 1]), [idx, 1]); });
+  const used = new Uint8Array(polys.length);
+  const take = (p, self) => {
+    const b = index.get(key(p));
+    if (!b) return null;
+    for (const [idx, end] of b) if (!used[idx] && idx !== self) { used[idx] = 1; return [idx, end]; }
+    return null;
+  };
+  const out = [];
+  for (let s = 0; s < polys.length; s++) {
+    if (used[s]) continue;
+    used[s] = 1;
+    let chain = polys[s].slice();
+    for (let m; (m = take(chain[chain.length - 1], s));) {
+      const pl = polys[m[0]];
+      chain = chain.concat((m[1] === 0 ? pl : pl.slice().reverse()).slice(1));
+    }
+    for (let m; (m = take(chain[0], s));) {
+      const pl = polys[m[0]];
+      chain = (m[1] === 1 ? pl : pl.slice().reverse()).slice(0, -1).concat(chain);
+    }
+    out.push(chain);
+  }
+  return out;
+}
+
+function analyzeDxf(text) {
+  const model = parseDxf(text);
+  const ins = parseInt(model.header.$INSUNITS, 10);
+  const unitMM = DXF_UNITS_MM[ins] || 1;
+  const info = {
+    kind: 'dxf', model, unitMM,
+    hasPhysicalSize: !!DXF_UNITS_MM[ins],
+    textCount: 0, imageCount: 0, hatchCount: 0,
+    extract: n => extractDxf(info, n)
+  };
+  const probe = info.extract(8);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const sh of probe) for (const pl of sh.polys) for (const p of pl) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  if (isFinite(minX)) { info.docW = (maxX - minX) * unitMM; info.docH = (maxY - minY) * unitMM; }
+  return info;
+}
+
+function extractDxf(info, n) {
+  const { model } = info;
+  const closed = [], open = [];
+  let closedCount = 0, texts = 0, images = 0, hatches = 0;
+  const hiddenLayer = name => {
+    const l = model.layers.get(name);
+    return !!l && ((l.flags & 1) !== 0 || l.color < 0);
+  };
+  const xf = (pts, M) => pts.map(p => ({ x: M[0] * p.x + M[2] * p.y + M[4], y: -(M[1] * p.x + M[3] * p.y + M[5]) }));
+  const emit = (pts, isClosed, M) => {
+    pts = xf(pts, M).filter(p => isFinite(p.x) && isFinite(p.y));
+    if (pts.length < 2) return;
+    const a = pts[0], b = pts[pts.length - 1];
+    if (!isClosed && pts.length > 2 && Math.hypot(a.x - b.x, a.y - b.y) < 1e-9) isClosed = true;
+    if (isClosed) {
+      if (Math.hypot(a.x - b.x, a.y - b.y) > 1e-9) pts.push({ ...a });
+      closed.push(pts);
+      closedCount++;
+    } else open.push(pts);
+  };
+
+  function walk(list, M, depth) {
+    for (let k = 0; k < list.length; k++) {
+      const e = list[k];
+      if (e.type === 'POLYLINE') {
+        // Gather the VERTEX … SEQEND run before any early exit
+        const verts = [];
+        while (list[k + 1] && list[k + 1].type === 'VERTEX') {
+          const v = list[++k];
+          if (!(dxfNum(v, 70) & 16)) verts.push({ x: dxfNum(v, 10), y: dxfNum(v, 20), b: dxfNum(v, 42) });
+        }
+        if (list[k + 1] && list[k + 1].type === 'SEQEND') k++;
+        e.verts = verts;
+      }
+      if (dxfVal(e, 67) === '1' || hiddenLayer(dxfVal(e, 8))) continue;
+      // Negative extrusion (OCS) mirrors X for planar entities
+      const O = dxfNum(e, 230, 1) < 0 ? matMul(M, [-1, 0, 0, 1, 0, 0]) : M;
+
+      switch (e.type) {
+        case 'LINE':
+          emit([{ x: dxfNum(e, 10), y: dxfNum(e, 20) }, { x: dxfNum(e, 11), y: dxfNum(e, 21) }], false, M);
+          break;
+        case 'LWPOLYLINE': {
+          const verts = [];
+          for (const [c, v] of e.g) {
+            if (c === 10) verts.push({ x: parseFloat(v), y: 0, b: 0 });
+            else if (c === 20 && verts.length) verts[verts.length - 1].y = parseFloat(v);
+            else if (c === 42 && verts.length) verts[verts.length - 1].b = parseFloat(v);
+          }
+          if (verts.length < 2) break;
+          const isClosed = (dxfNum(e, 70) & 1) === 1;
+          emit(bulgePoly(verts, isClosed, n), isClosed, O);
+          break;
+        }
+        case 'POLYLINE': {
+          const flags = dxfNum(e, 70);
+          if (flags & (16 | 64) || e.verts.length < 2) break; // 3D meshes
+          const isClosed = (flags & 1) === 1;
+          emit(bulgePoly(e.verts, isClosed, n), isClosed, O);
+          break;
+        }
+        case 'CIRCLE': {
+          const r = dxfNum(e, 40);
+          if (r > 0) emit(arcPolyline(dxfNum(e, 10), dxfNum(e, 20), r, r, 0, 2 * Math.PI, n), true, O);
+          break;
+        }
+        case 'ARC': {
+          const r = dxfNum(e, 40);
+          const a0 = dxfNum(e, 50) * Math.PI / 180;
+          let sweep = dxfNum(e, 51) * Math.PI / 180 - a0;
+          while (sweep <= 0) sweep += 2 * Math.PI;
+          if (r > 0) emit(arcPolyline(dxfNum(e, 10), dxfNum(e, 20), r, r, a0, sweep, n), false, O);
+          break;
+        }
+        case 'ELLIPSE': {
+          const mx = dxfNum(e, 11), my = dxfNum(e, 21), ratio = dxfNum(e, 40, 1);
+          const rx = Math.hypot(mx, my), ry = rx * ratio;
+          const p0 = dxfNum(e, 41, 0);
+          let sweep = dxfNum(e, 42, 2 * Math.PI) - p0;
+          while (sweep <= 0) sweep += 2 * Math.PI;
+          const full = Math.abs(sweep - 2 * Math.PI) < 1e-6;
+          // Flipped extrusion: minor axis = N × major points the other way
+          const ryEff = dxfNum(e, 230, 1) < 0 ? -ry : ry;
+          const pts = arcPolyline(dxfNum(e, 10), dxfNum(e, 20), rx, ryEff, p0, sweep, n, Math.atan2(my, mx));
+          if (rx > 0) emit(pts, full, M);
+          break;
+        }
+        case 'SPLINE': {
+          const ctrl = [], fit = [], knots = [], weights = [];
+          for (const [c, v] of e.g) {
+            const f = parseFloat(v);
+            if (c === 10) ctrl.push({ x: f, y: 0 });
+            else if (c === 20 && ctrl.length) ctrl[ctrl.length - 1].y = f;
+            else if (c === 11) fit.push({ x: f, y: 0 });
+            else if (c === 21 && fit.length) fit[fit.length - 1].y = f;
+            else if (c === 40) knots.push(f);
+            else if (c === 41) weights.push(f);
+          }
+          const isClosed = (dxfNum(e, 70) & 1) === 1;
+          const pts = ctrl.length >= 2 ? splinePoints(dxfNum(e, 71, 3), knots, ctrl, weights, n) : fitCurve(fit, n, isClosed);
+          if (pts.length >= 2) emit(pts, isClosed, M);
+          break;
+        }
+        case 'SOLID':
+        case 'TRACE': {
+          // Corner order is 1-2-4-3
+          const c = [10, 11, 13, 12].map(code => ({ x: dxfNum(e, code), y: dxfNum(e, code + 10) }));
+          emit(c, true, O);
+          break;
+        }
+        case 'INSERT': {
+          const blk = model.blocks.get(dxfVal(e, 2, ''));
+          if (!blk || depth > 16) break;
+          const sx = dxfNum(e, 41, 1), sy = dxfNum(e, 42, 1), rot = dxfNum(e, 50) * Math.PI / 180;
+          const cols = Math.max(1, dxfNum(e, 70, 1)), rows = Math.max(1, dxfNum(e, 71, 1));
+          const cs = dxfNum(e, 44), rs = dxfNum(e, 45);
+          const c = Math.cos(rot), s = Math.sin(rot);
+          for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) {
+            let T = [1, 0, 0, 1, dxfNum(e, 10), dxfNum(e, 20)];
+            T = matMul(T, [c, s, -s, c, 0, 0]);
+            T = matMul(T, [1, 0, 0, 1, q * cs, r * rs]);
+            T = matMul(T, [sx, 0, 0, sy, 0, 0]);
+            T = matMul(T, [1, 0, 0, 1, -blk.bx, -blk.by]);
+            walk(blk.ents, matMul(O, T), depth + 1);
+          }
+          break;
+        }
+        case 'TEXT': case 'MTEXT': case 'ATTRIB': case 'DIMENSION': case 'LEADER': case 'MULTILEADER':
+          texts++;
+          break;
+        case 'IMAGE': case 'WIPEOUT': case 'OLE2FRAME':
+          images++;
+          break;
+        case 'HATCH':
+          hatches++;
+          break;
+      }
+    }
+  }
+  walk(model.entities, IDENTITY, 0);
+  info.textCount = texts;
+  info.imageCount = images;
+  info.hatchCount = hatches;
+
+  // Chain touching segments, promote closed loops
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const pl of [...closed, ...open]) for (const p of pl) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  const tol = Math.max(1e-9, Math.hypot(maxX - minX, maxY - minY) * 1e-5);
+  const openShapes = [];
+  for (const ch of open.length ? joinChains(open, tol) : []) {
+    const a = ch[0], b = ch[ch.length - 1];
+    if (ch.length > 2 && Math.hypot(a.x - b.x, a.y - b.y) <= tol * 2) {
+      ch[ch.length - 1] = { ...a };
+      closed.push(ch);
+      closedCount++;
+    } else openShapes.push({ polys: [ch], closed: false, count: 1 });
+  }
+  // All closed loops share one even-odd fill, so nested contours become holes
+  const shapes = [];
+  if (closed.length) shapes.push({ polys: closed, closed: true, count: closedCount });
+  return shapes.concat(openShapes);
+}
+
+// Lightweight SVG rendering of extracted shapes (thumbnail / source tab)
+function shapesToSvg(shapes) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let d = '';
+  for (const sh of shapes) for (const pl of sh.polys) {
+    d += 'M' + pl.map(p => {
+      if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+      return +p.x.toFixed(3) + ' ' + +p.y.toFixed(3);
+    }).join('L');
+  }
+  if (!isFinite(minX)) return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"/>';
+  const w = Math.max(maxX - minX, 1e-6), h = Math.max(maxY - minY, 1e-6), pad = Math.max(w, h) * 0.02;
+  const ratio = w / h;
+  const W = ratio >= 1 ? 800 : Math.round(800 * ratio), H = ratio >= 1 ? Math.round(800 / ratio) : 800;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${minX - pad} ${minY - pad} ${w + 2 * pad} ${h + 2 * pad}"><path d="${d}" fill="none" stroke="#000" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
 }
 
 /* ═══════════════════════════════════════════════
@@ -2286,9 +2692,8 @@ function updateHatchPreview(s = readSettings()) {
 
 function loadFile(file) {
   if (!file) return;
-  const isSvg = /\.svg$/i.test(file.name) || file.type === 'image/svg+xml';
-  if (!isSvg) {
-    toast('Format non pris en charge. Sélectionnez un fichier .svg', 'error');
+  if (!fileKind(file.name, file.type)) {
+    toast('Format non pris en charge. Sélectionnez un fichier .svg ou .dxf', 'error');
     return;
   }
   if (file.size > 20 * 1024 * 1024) {
@@ -2296,24 +2701,33 @@ function loadFile(file) {
   }
   setBusy(true);
   const reader = new FileReader();
-  reader.onload = () => openSvg(file.name, file.size, reader.result);
+  reader.onload = () => openFile(file.name, file.size, reader.result);
   reader.onerror = () => { setBusy(false); toast('Impossible de lire le fichier', 'error'); };
   reader.readAsText(file);
 }
 
-function openSvg(name, size, text) {
+function fileKind(name, type = '') {
+  if (/\.dxf$/i.test(name) || /dxf/i.test(type)) return 'dxf';
+  if (/\.svg$/i.test(name) || type === 'image/svg+xml') return 'svg';
+  return null;
+}
+
+function openFile(name, size, text) {
+  const kind = fileKind(name);
   let info;
   try {
-    info = analyzeSvg(text);
+    info = kind === 'dxf' ? analyzeDxf(text) : analyzeSvg(text);
   } catch (e) {
     setBusy(false);
     toast(e.message, 'error');
     return;
   }
   if (state.file?.url) URL.revokeObjectURL(state.file.url);
-  // Render the source through <img> (sandboxed: no scripts, no external loads)
-  const url = URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' }));
-  state.file = { name, size, text, url, base: name.replace(/\.svg$/i, '') || 'gravure' };
+  // Render the source through <img> (sandboxed: no scripts, no external loads).
+  // DXF has no native browser rendering: draw its geometry as an SVG.
+  const svgText = kind === 'dxf' ? shapesToSvg(info.extract(32)) : text;
+  const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }));
+  state.file = { name, size, text, url, kind, base: name.replace(/\.(svg|dxf)$/i, '') || 'gravure' };
   state.info = info;
   state.geomCache.clear();
   state.view.fitted = true;
@@ -2323,6 +2737,7 @@ function openSvg(name, size, text) {
   els.fileName.textContent = name;
   els.fileName.title = name;
   els.topbarFile.innerHTML = `<b>${escapeHtml(name)}</b>`;
+  els.sourceImg.alt = `Aperçu du fichier source ${name}`;
   els.footerName.textContent = state.file.base + '.plt';
   els.fileEmpty.hidden = true;
   els.fileCard.hidden = false;
@@ -2347,7 +2762,7 @@ function closeFile() {
   els.fileCard.hidden = true;
   els.fileEmpty.hidden = false;
   els.empty.hidden = false;
-  els.topbarFile.textContent = 'SVG → PLT · HPGL';
+  els.topbarFile.textContent = 'SVG / DXF → PLT · HPGL';
   els.footerName.textContent = 'Aucun fichier';
   els.fileThumb.removeAttribute('src');
   els.sourceImg.removeAttribute('src');
@@ -2394,7 +2809,7 @@ function convert() {
   try {
     let shapes = state.geomCache.get(s.curveRes);
     if (!shapes) {
-      shapes = extractGeometry(state.info, s.curveRes);
+      shapes = state.info.extract(s.curveRes);
       state.geomCache.set(s.curveRes, shapes);
     }
     const issues = [];
@@ -2414,13 +2829,19 @@ function convert() {
     const plt = emitHPGL(ordered);
     const timeSec = plt.drawMM / s.speedDraw + plt.travelMM / s.speedTravel;
 
-    state.result = { ...plt, layout, settings: s, elemCount: shapes.length, hatchCount, timeSec };
+    const elemCount = shapes.reduce((n, sh) => n + (sh.count || 1), 0);
+    state.result = { ...plt, layout, settings: s, elemCount, hatchCount, timeSec };
 
     if (state.info.textCount) issues.push({ level: 'warn', text: textWarning(state.info.textCount) });
     if (state.info.imageCount) issues.push({ level: 'warn', text: `${state.info.imageCount} image(s) bitmap ignorée(s) — seuls les tracés vectoriels sont convertis.` });
     if (layout.overflow) issues.push({ level: 'error', text: 'Le dessin dépasse de la page. Réduisez l\'échelle ou passez en mode « Ajuster ».' });
     else if (layout.outsideMargin) issues.push({ level: 'warn', text: 'Le dessin empiète sur la marge de sécurité.' });
-    if (s.scaleMode !== 'fit' && !state.info.hasPhysicalSize) issues.push({ level: 'info', text: 'Le SVG ne déclare pas de dimensions physiques : 1 unité = 1 px (0,265 mm).' });
+    if (state.info.kind === 'dxf' && state.info.hatchCount) issues.push({ level: 'info', text: `${state.info.hatchCount} hachure(s) DXF ignorée(s) — utilisez l'option « Remplissage » pour hachurer les contours fermés.` });
+    if (s.scaleMode !== 'fit' && !state.info.hasPhysicalSize) {
+      issues.push({ level: 'info', text: state.info.kind === 'dxf'
+        ? 'Le DXF ne déclare pas d\'unité ($INSUNITS) : 1 unité = 1 mm.'
+        : 'Le SVG ne déclare pas de dimensions physiques : 1 unité = 1 px (0,265 mm).' });
+    }
     if (s.hatchEnable && !hatchCount) issues.push({ level: 'info', text: 'Aucune forme fermée à hachurer dans ce fichier.' });
     setIssues(issues);
   } catch (e) {
@@ -2434,6 +2855,9 @@ function convert() {
 }
 
 function textWarning(n) {
+  if (state.info?.kind === 'dxf') {
+    return `${n} texte(s) ou cote(s) ignoré(s). Décomposez les textes en polylignes dans votre logiciel de CAO (AutoCAD : commande TXTEXP).`;
+  }
   return `${n} élément(s) <text> ignoré(s). Convertissez les textes en tracés dans votre éditeur (Inkscape : Chemin › Objet en chemin).`;
 }
 
@@ -2842,7 +3266,7 @@ $('#btnRemove').addEventListener('click', closeFile);
 $('#btnBrowse').addEventListener('click', e => { e.stopPropagation(); openPicker(); });
 $('#btnSample').addEventListener('click', e => {
   e.stopPropagation();
-  openSvg('exemple.svg', SAMPLE_SVG.length, SAMPLE_SVG);
+  openFile('exemple.svg', SAMPLE_SVG.length, SAMPLE_SVG);
 });
 $('#emptyCard').addEventListener('click', openPicker);
 $('#emptyCard').addEventListener('keydown', e => {
