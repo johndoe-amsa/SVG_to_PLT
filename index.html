@@ -1146,6 +1146,10 @@ dialog.sheet form { display: grid; gap: 24px; }
               <span class="switch-text"><b>Optimiser les déplacements</b><small>Réordonne les tracés pour réduire les trajets à vide</small></span>
               <input type="checkbox" class="switch" name="optimize" checked>
             </label>
+            <label class="switch-row">
+              <span class="switch-text"><b>Aperçu lissé</b><small>Masque l'arrondi à 0,025 mm du format PLT dans l'aperçu. Sans effet sur le fichier exporté.</small></span>
+              <input type="checkbox" class="switch" name="smoothPreview" id="smoothPreview" checked>
+            </label>
             <div class="row">
               <div class="field">
                 <label class="field-label" for="speedDraw">Vit. gravure
@@ -1392,7 +1396,7 @@ const SPACING_MIN = 0.025, SPACING_MAX = 5; // 0,025 mm = 1 unité HPGL
 
 const DEFAULTS = {
   origin: 'bl', marginEnable: false, margin: 5, rotation: '0', mirror: false,
-  curveRes: 32, optimize: true, speedDraw: 20, speedTravel: 150,
+  curveRes: 32, optimize: true, smoothPreview: true, speedDraw: 20, speedTravel: 150,
   hatchEnable: false, hatchType: 'lines', hatchSpacing: 0.5, hatchAngle: 45,
   hatchContoursAlso: true, hatchBidirectional: true
 };
@@ -2536,7 +2540,7 @@ function buildStrokes(layout, s) {
 
 function emitHPGL(strokes) {
   const out = ['IN;', 'SP1;'];
-  const plot = [];            // [{ pts: Float64Array (mm), from: {x,y}|null }]
+  const plot = [];            // [{ pts: exported (mm), raw: unrounded (mm), cont: no pen-up before, kind }]
   let lx = null, ly = null;   // last position (HPGL units)
   let draw = 0, travel = 0;
 
@@ -2551,7 +2555,8 @@ function emitHPGL(strokes) {
     if (pts.length < 2) continue;
 
     const [x0, y0] = pts[0];
-    if (x0 !== lx || y0 !== ly) {
+    const cont = x0 === lx && y0 === ly;
+    if (!cont) {
       if (lx !== null) travel += Math.hypot(x0 - lx, y0 - ly);
       out.push(`PU${x0},${y0};`);
     }
@@ -2565,7 +2570,9 @@ function emitHPGL(strokes) {
       px = x; py = y;
       flat[i * 2] = x / HPU; flat[i * 2 + 1] = y / HPU;
     }
-    plot.push({ pts: flat, kind: st.kind });
+    const raw = new Float64Array(st.pts.length * 2);
+    st.pts.forEach((p, i) => { raw[i * 2] = p.x; raw[i * 2 + 1] = p.y; });
+    plot.push({ pts: flat, raw, cont, kind: st.kind });
     lx = px; ly = py;
   }
   out.push('PU;');
@@ -3043,7 +3050,7 @@ const P = {
   origin: $('#originMark'), head: $('#headMark')
 };
 // Path data cache: rebuilt only when the result or the simulated range changes
-let pathCache = { key: '', shown: -1 };
+let pathCache = { key: '', shown: -1, smooth: null };
 
 function viewBounds() {
   const r = state.result;
@@ -3098,15 +3105,16 @@ function polyD(p) {
   return d;
 }
 
-function buildPaths(r, shown) {
+function buildPaths(r, shown, smooth) {
   const plot = r.plot;
   let contour = '', hatch = '', travel = '', ghost = '';
   let lx = 0, ly = 0;
   for (let i = 0; i < plot.length; i++) {
-    const p = plot[i].pts;
+    // Smooth: source geometry; otherwise the exact 0,025 mm grid written to the PLT
+    const p = smooth ? plot[i].raw : plot[i].pts;
     const d = polyD(p);
     if (i < shown) {
-      if (i > 0 && (p[0] !== lx || p[1] !== ly)) travel += 'M' + num(lx) + ' ' + num(ly) + 'L' + num(p[0]) + ' ' + num(p[1]);
+      if (i > 0 && !plot[i].cont) travel += 'M' + num(lx) + ' ' + num(ly) + 'L' + num(p[0]) + ' ' + num(p[1]);
       if (plot[i].kind === 'hatch') hatch += d; else contour += d;
       lx = p[p.length - 2]; ly = p[p.length - 1];
     } else ghost += d;
@@ -3127,13 +3135,14 @@ function render() {
   els.zoomVal.textContent = Math.round((v.zoom / (v.fitZoom || 1)) * 100) + '%';
   const r = state.file && state.result;
   els.stage.style.visibility = r ? 'visible' : 'hidden';
-  if (!r) { pathCache = { key: '', shown: -1 }; return; }
+  if (!r) { pathCache = { key: '', shown: -1, smooth: null }; return; }
 
   const total = r.plot.length;
   const shown = state.sim.on ? Math.max(0, Math.min(total, Math.round(total * state.sim.progress))) : total;
-  if (pathCache.key !== r || pathCache.shown !== shown) {
-    buildPaths(r, shown);
-    pathCache = { key: r, shown };
+  const smooth = $('#smoothPreview').checked;
+  if (pathCache.key !== r || pathCache.shown !== shown || pathCache.smooth !== smooth) {
+    buildPaths(r, shown, smooth);
+    pathCache = { key: r, shown, smooth };
   }
 
   // World (mm, Y up) → screen px. Strokes use non-scaling-stroke: always crisp hairlines.
@@ -3398,6 +3407,7 @@ window.addEventListener('drop', e => {
 els.form.addEventListener('submit', e => e.preventDefault());
 els.form.addEventListener('input', e => {
   const t = e.target;
+  if (t.name === 'smoothPreview') { saveSettingsLocal(); requestRender(); return; }
   if (t === els.sizeW) { onSizeInput('w'); return; }
   if (t === els.sizeH) { onSizeInput('h'); return; }
   if (t.id === 'hatchSpacingRange') {
@@ -3412,6 +3422,7 @@ els.form.addEventListener('input', e => {
 });
 els.form.addEventListener('change', e => {
   const t = e.target;
+  if (t.name === 'smoothPreview') { saveSettingsLocal(); requestRender(); return; }
   if (t === els.sizeW || t === els.sizeH) { updateSizeUI(); return; }
   if (t.name === 'rotation' || t.name === 'origin' || t.name === 'marginEnable' || t.name === 'margin') state.view.fitted = true;
   syncControls();
