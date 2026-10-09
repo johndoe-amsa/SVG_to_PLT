@@ -2,1449 +2,1540 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LASERPLOT — SVG → PLT Converter</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Convertisseur SVG vers PLT (HPGL) pour graveurs laser et traceurs. 100% local, aucun envoi de données.">
+<meta name="color-scheme" content="light dark">
+<title>Laserplot — SVG vers PLT</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23000'/%3E%3Cpath d='M16 8v16M8 16h16' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='16' r='5' fill='none' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+/* ═══════════════════════════════════════════════
+   TOKENS
+   ═══════════════════════════════════════════════ */
 :root {
-  /* Palette — Vercel / Minimalist (Light) */
+  color-scheme: light;
   --bg: #FFFFFF;
-  --bg-secondary: #FAFAFA;
-  --surface: #FFFFFF;
-  --surface2: #FAFAFA;
-  --border-subtle: #EAEAEA;
+  --bg-2: #FAFAFA;
+  --border: #EAEAEA;
   --border-strong: #000000;
   --text: #000000;
-  --text-secondary: #666666;
+  --text-2: #666666;
+  --overlay: rgba(255, 255, 255, 0.8);
+  --hover: rgba(0, 0, 0, 0.04);
+  --skeleton: #EAEAEA;
+  --backdrop: rgba(0, 0, 0, 0.24);
 
-  /* Couleurs semantiques */
   --success: #0070F3;
   --error: #EE0000;
   --warning: #F5A623;
 
-  /* Typographie */
   --sans: "Geist", system-ui, -apple-system, sans-serif;
   --mono: "Geist Mono", Menlo, monospace;
 
-  /* Espacements (multiples de 8px) */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 16px;
-  --space-lg: 24px;
-  --space-xl: 32px;
-  --space-2xl: 48px;
-  --space-3xl: 64px;
+  --r-badge: 6px;
+  --r-input: 8px;
+  --r-card: 12px;
+  --r-full: 9999px;
 
-  /* Rayons */
-  --radius-badge: 6px;
-  --radius-input: 8px;
-  --radius-card: 12px;
-  --radius-full: 9999px;
-
-  /* Transitions (snappy) */
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
-  --transition-micro: 150ms var(--ease-out);
-  --transition-normal: 250ms var(--ease-out);
+  --spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --t-micro: 150ms var(--ease-out);
+  --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  font-family: var(--sans);
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  line-height: 1.5;
-  font-size: 16px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Scrollbars */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: var(--radius-full); }
-::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
-
-/* ── HEADER ── */
-.header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-md) var(--space-lg);
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border-subtle);
-  position: sticky;
-  top: 0;
-  z-index: 50;
-}
-
-.logo {
-  width: 32px; height: 32px;
-  background: var(--text);
-  border-radius: var(--radius-input);
-  border: none;
-  position: relative;
-  flex-shrink: 0;
-}
-.logo::after {
-  content: '';
-  position: absolute;
-  width: 8px; height: 8px;
-  background: var(--bg);
-  border-radius: 2px;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.header-title {
-  flex: 1;
-}
-.header-title h1 {
-  font-family: var(--sans);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.04em;
-  line-height: 1.1;
-}
-.header-title span {
-  font-size: 14px;
-  color: var(--text-secondary);
-  font-weight: 400;
-}
-
-.header-badge {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: var(--surface2);
-  padding: var(--space-xs) var(--space-md);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-badge);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-/* ── MAIN LAYOUT ── */
-.main {
-  display: grid;
-  grid-template-columns: 400px 1fr;
-  flex: 1;
-  overflow: hidden;
-  max-width: 1200px;
-  width: 100%;
-  margin: 0 auto;
-}
-
-/* ── SIDEBAR ── */
-.sidebar {
-  background: var(--surface);
-  border-right: 1px solid var(--border-subtle);
-  overflow-y: auto;
-  padding: var(--space-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.section-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  margin-top: var(--space-lg);
-}
-.section-label:first-child { margin-top: 0; }
-.section-label::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border-subtle);
-}
-
-/* ── FORM ELEMENTS ── */
-.field-label {
-  font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  margin-top: var(--space-sm);
-  margin-bottom: var(--space-xs);
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.info-btn {
-  width: 18px; height: 18px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-subtle);
-  background: transparent;
-  font-family: var(--sans);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: help;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all var(--transition-micro);
-}
-.info-btn:hover {
-  background: var(--surface2);
-  color: var(--text);
-  border-color: var(--border-strong);
-}
-
-input[type="number"], select {
-  width: 100%;
-  font-family: var(--sans);
-  font-size: 14px;
-  padding: 10px 12px;
-  background: var(--surface2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-input);
-  color: var(--text);
-  outline: none;
-  transition: border-color var(--transition-micro), box-shadow var(--transition-micro);
-}
-input[type="number"]:focus, select:focus {
-  border-color: var(--border-strong);
-  box-shadow: 0 0 0 1px var(--border-strong);
-}
-select {
-  cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666666' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 32px;
-}
-
-.row-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-sm);
-}
-
-/* ── CHECKBOX ── */
-.check-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
-  cursor: pointer;
-  font-family: var(--sans);
-  font-size: 14px;
-  color: var(--text);
-  letter-spacing: 0;
-  user-select: none;
-}
-.check-row input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 18px; height: 18px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-badge);
-  background: transparent;
-  cursor: pointer;
-  position: relative;
-  flex-shrink: 0;
-  transition: all var(--transition-micro);
-}
-.check-row input[type="checkbox"]:checked {
-  background: var(--text);
-  border-color: var(--text);
-}
-.check-row input[type="checkbox"]:checked::after {
-  content: '';
-  position: absolute;
-  left: 5px; top: 2px;
-  width: 5px; height: 9px;
-  border: solid var(--bg);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-
-/* ── RANGE SLIDER ── */
-.range-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-top: var(--space-xs);
-}
-input[type="range"] {
-  flex: 1;
-  -webkit-appearance: none;
-  appearance: none;
-  height: 2px;
-  background: var(--border-subtle);
-  border-radius: 1px;
-  outline: none;
-  cursor: pointer;
-}
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 16px; height: 16px;
-  background: var(--text);
-  border: none;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: transform var(--transition-micro);
-}
-input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-}
-input[type="range"]::-moz-range-thumb {
-  width: 16px; height: 16px;
-  background: var(--text);
-  border: none;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-}
-.range-val {
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  min-width: 36px;
-  text-align: right;
-}
-
-/* ── PRESET BUTTONS ── */
-.preset-btns {
-  display: flex;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
-}
-.btn-preset {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-sm);
-  font-family: var(--sans);
-  font-size: 14px;
-  font-weight: 500;
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  transition: all var(--transition-micro);
-}
-.btn-preset:hover {
-  border-color: var(--border-strong);
-  background: var(--surface2);
-}
-.btn-preset:active { transform: scale(0.95); }
-.btn-preset svg { width: 14px; height: 14px; stroke-width: 1.5; }
-
-/* ── DROPZONE ── */
-.dropzone {
-  position: relative;
-  border: 1px dashed var(--border-subtle);
-  border-radius: var(--radius-card);
-  padding: var(--space-xl);
-  text-align: center;
-  cursor: pointer;
-  transition: all var(--transition-micro);
-  margin-top: var(--space-sm);
-}
-.dropzone:hover, .dropzone.drag-over {
-  border-color: var(--text);
-  background: var(--surface2);
-}
-.dropzone input[type="file"] {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-.dropzone-text {
-  font-family: var(--sans);
-  font-size: 14px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-.dropzone-text strong {
-  color: var(--text);
-  font-weight: 600;
-}
-.file-info {
-  display: none;
-  margin-top: var(--space-sm);
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--success);
-  gap: var(--space-sm);
-  align-items: center;
-}
-.file-info.visible { display: flex; }
-.file-info svg { width: 14px; height: 14px; flex-shrink: 0; stroke-width: 1.5; }
-
-/* ── HATCH PANEL ── */
-.hatch-disabled {
-  opacity: 0.35;
-  pointer-events: none;
-  transition: opacity var(--transition-normal);
-}
-
-.hatch-preview-box {
-  margin-top: var(--space-sm);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
-  background: var(--surface2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-sm);
-  overflow: hidden;
-}
-.hatch-preview-box svg {
-  width: 100%;
-  height: auto;
-}
-
-/* ── CONVERT BUTTON (Primary — Contraste pur) ── */
-.btn-convert {
-  width: 100%;
-  font-family: var(--sans);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0;
-  padding: 12px var(--space-lg);
-  background: var(--text);
-  color: var(--bg);
-  border: none;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  margin-top: var(--space-lg);
-  transition: opacity var(--transition-micro), transform var(--transition-micro);
-}
-.btn-convert:hover:not(:disabled) {
-  opacity: 0.85;
-}
-.btn-convert:active:not(:disabled) {
-  transform: scale(0.95);
-}
-.btn-convert:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* ── OUTPUT PANEL ── */
-.output-panel {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg);
-}
-
-.output-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-md) var(--space-lg);
-  border-bottom: 1px solid var(--border-subtle);
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-.output-toolbar h2 {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.btn-download {
-  display: flex;
-  align-items: center;
-  opacity: 0;
-  pointer-events: none;
-  gap: var(--space-sm);
-  font-family: var(--sans);
-  font-size: 14px;
-  font-weight: 500;
-  padding: var(--space-sm) var(--space-md);
-  background: var(--text);
-  color: var(--bg);
-  border: none;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: opacity var(--transition-micro), transform var(--transition-micro);
-}
-.btn-download:hover { opacity: 0.85; }
-.btn-download:active { transform: scale(0.95); }
-.btn-download svg { width: 14px; height: 14px; stroke-width: 1.5; }
-.btn-download.visible { opacity: 1; pointer-events: auto; }
-
-.stats-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-lg);
-  padding: 0 var(--space-lg);
-  max-height: 0;
-  overflow: hidden;
-  background: var(--surface2);
-  border-bottom: 1px solid transparent;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--text-secondary);
-  letter-spacing: 0;
-  transition: max-height var(--transition-normal), padding var(--transition-normal), border-color var(--transition-normal);
-}
-.stats-bar.visible {
-  max-height: 60px;
-  padding: var(--space-sm) var(--space-lg);
-  border-bottom-color: var(--border-subtle);
-}
-.stat-item span { color: var(--text); font-weight: 600; }
-
-.output-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--space-lg);
-}
-
-/* ── PLACEHOLDER (Skeleton-style) ── */
-.placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: var(--space-lg);
-}
-.placeholder-grid {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: var(--space-sm);
-}
-.placeholder-grid .sq {
-  width: 12px; height: 12px;
-  background: var(--surface2);
-  border-radius: 3px;
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
-}
-.placeholder-grid .sq:nth-child(even) { animation-delay: 0.3s; }
-.placeholder-grid .sq:nth-child(3n) { animation-delay: 0.6s; }
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
-.placeholder p {
-  font-family: var(--sans);
-  font-size: 14px;
-  color: var(--text-secondary);
-  text-align: center;
-  line-height: 1.5;
-}
-.placeholder.hidden { display: none; }
-
-/* ── ALERTS ── */
-.alert {
-  padding: 10px var(--space-md);
-  font-family: var(--sans);
-  font-size: 14px;
-  margin-bottom: 0;
-  line-height: 1.5;
-  border-radius: var(--radius-input);
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
-  transition: opacity var(--transition-normal), max-height var(--transition-normal), margin-bottom var(--transition-normal), padding var(--transition-normal);
-  padding-top: 0;
-  padding-bottom: 0;
-}
-.alert.visible {
-  max-height: 200px;
-  opacity: 1;
-  margin-bottom: var(--space-md);
-  padding-top: 12px;
-  padding-bottom: 12px;
-}
-.alert-warn {
-  background: rgba(245, 166, 35, 0.06);
-  border: 1px solid rgba(245, 166, 35, 0.25);
-  color: #96690A;
-}
-.alert-error {
-  background: rgba(238, 0, 0, 0.04);
-  border: 1px solid rgba(238, 0, 0, 0.2);
-  color: var(--error);
-}
-.alert-success {
-  background: rgba(0, 112, 243, 0.04);
-  border: 1px solid rgba(0, 112, 243, 0.2);
-  color: var(--success);
-}
-
-/* ── SVG PREVIEW ── */
-.svg-preview {
-  margin-bottom: var(--space-md);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  padding: var(--space-md);
-  text-align: center;
-  opacity: 0;
-  max-height: 0;
-  overflow: hidden;
-  transition: opacity var(--transition-normal), max-height var(--transition-normal);
-}
-.svg-preview.visible {
-  opacity: 1;
-  max-height: 300px;
-}
-.svg-preview svg {
-  max-width: 100%;
-  max-height: 170px;
-}
-
-/* ── PLT PREVIEW ── */
-.plt-preview {
-  margin-top: var(--space-sm);
-  opacity: 0;
-  transition: opacity var(--transition-normal);
-  visibility: hidden;
-}
-.plt-preview.visible {
-  opacity: 1;
-  visibility: visible;
-}
-.plt-preview pre {
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.6;
-  background: var(--surface2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
-  padding: var(--space-md);
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-.cmd-init { color: var(--success); }
-.cmd-move { color: var(--text-secondary); }
-.cmd-draw { color: var(--text); }
-
-/* ── MODAL ── */
-.modal-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 100;
-  align-items: center;
-  justify-content: center;
-}
-.modal-overlay.visible {
-  display: flex;
-  animation: fade-in 200ms var(--ease-out);
-}
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.modal {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
-  padding: var(--space-lg);
-  width: 380px;
-  max-width: 90vw;
-  animation: modal-slide-up 250ms var(--ease-out);
-}
-@keyframes modal-slide-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.modal h3 {
-  font-family: var(--sans);
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.3;
-  margin-bottom: var(--space-md);
-  color: var(--text);
-}
-.modal input[type="text"] {
-  width: 100%;
-  font-family: var(--sans);
-  font-size: 14px;
-  padding: 10px 12px;
-  background: var(--surface2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-input);
-  color: var(--text);
-  outline: none;
-  margin-bottom: var(--space-md);
-  transition: border-color var(--transition-micro), box-shadow var(--transition-micro);
-}
-.modal input[type="text"]:focus {
-  border-color: var(--border-strong);
-  box-shadow: 0 0 0 1px var(--border-strong);
-}
-.modal-btns {
-  display: flex;
-  gap: var(--space-sm);
-  justify-content: flex-end;
-}
-.modal-btns button {
-  font-family: var(--sans);
-  font-size: 14px;
-  font-weight: 500;
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  transition: all var(--transition-micro);
-}
-.modal-btns button:hover {
-  border-color: var(--border-strong);
-  background: var(--surface2);
-}
-.modal-btns button:active { transform: scale(0.95); }
-.modal-btns .btn-confirm {
-  background: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
-}
-.modal-btns .btn-confirm:hover {
-  opacity: 0.85;
-}
-
-/* ── TOOLTIP ── */
-#globalTooltip {
-  display: none;
-  position: fixed;
-  z-index: 200;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
-  padding: var(--space-md);
-  max-width: 280px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-#globalTooltip.visible { display: block; }
-#globalTooltip::before {
-  content: '';
-  position: absolute;
-  left: -6px;
-  top: 16px;
-  width: 10px; height: 10px;
-  background: rgba(255, 255, 255, 0.8);
-  border-left: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-  transform: rotate(45deg);
-}
-#globalTooltip .tt-title {
-  font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  margin-bottom: var(--space-xs);
-}
-#globalTooltip .tt-body {
-  font-family: var(--sans);
-  font-size: 14px;
-  color: var(--text);
-}
-
-/* ── ANIMATIONS ── */
-.dropzone.drag-over {
-  border-color: var(--text);
-  background: var(--surface2);
-}
-
-/* Skeleton loader for convert button loading state */
-.btn-convert.loading {
-  pointer-events: none;
-  position: relative;
-  color: transparent;
-  overflow: hidden;
-}
-.btn-convert.loading::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: var(--radius-full);
-  background: linear-gradient(90deg, var(--text) 25%, var(--text-secondary) 50%, var(--text) 75%);
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
-}
-@keyframes skeleton-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-/* ── FOCUS STATES (ring-2 ring-offset-2) ── */
-input[type="number"]:focus-visible,
-select:focus-visible,
-input[type="range"]:focus-visible,
-.btn-preset:focus-visible,
-.btn-convert:focus-visible,
-.btn-download:focus-visible,
-.info-btn:focus-visible,
-.modal-btns button:focus-visible,
-.toggle-btn:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 2px;
-}
-.check-row input[type="checkbox"]:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 2px;
-}
-
-/* ── PLT CANVAS & VIEW TOGGLE ── */
-.plt-view-toggle {
-  display: none;
-  margin-bottom: var(--space-sm);
-}
-.plt-view-toggle.visible { display: flex; }
-.toggle-btn {
-  font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--border-subtle);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-micro);
-}
-.toggle-btn:first-child {
-  border-right: none;
-  border-radius: var(--radius-input) 0 0 var(--radius-input);
-}
-.toggle-btn:last-child {
-  border-radius: 0 var(--radius-input) var(--radius-input) 0;
-}
-.toggle-btn.active {
-  background: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
-}
-#pltCanvas {
-  display: none;
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-}
-#pltCanvas.visible { display: block; }
-
-/* ── RESPONSIVE (Mobile-First degradation) ── */
-@media (max-width: 1024px) {
-  .main { grid-template-columns: 340px 1fr; }
-  .sidebar { padding: var(--space-md); }
-}
-
-@media (max-width: 768px) {
-  .main {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-  }
-  .sidebar {
-    max-height: 50vh;
-    overflow-y: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--border-subtle);
-    padding: var(--space-md);
-  }
-  .header { padding: var(--space-sm) var(--space-md); }
-  .header-badge { display: none; }
-  .output-toolbar { padding: var(--space-sm) var(--space-md); }
-  .output-content { padding: var(--space-md); }
-  .stats-bar.visible { padding: var(--space-sm) var(--space-md); }
-  #globalTooltip { max-width: 220px; }
-
-  /* Modal → Bottom Sheet on mobile */
-  .modal-overlay.visible {
-    align-items: flex-end;
-  }
-  .modal {
-    width: 100%;
-    max-width: 100vw;
-    border-radius: var(--radius-card) var(--radius-card) 0 0;
-    animation: bottom-sheet-up 300ms var(--ease-out);
-    padding: var(--space-lg) var(--space-md);
-  }
-  @keyframes bottom-sheet-up {
-    from { opacity: 0; transform: translateY(100%); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-}
-
-@media (max-width: 480px) {
-  .sidebar { padding: var(--space-sm) var(--space-md); }
-  .preset-btns { flex-direction: column; }
-  .row-2 { grid-template-columns: 1fr; }
-  .header-title h1 { font-size: 16px; }
-  .output-content { padding: var(--space-md); }
-}
-
-/* ── DARK MODE TOGGLE BUTTON ── */
-.btn-theme {
-  width: 32px; height: 32px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-subtle);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all var(--transition-micro);
-}
-.btn-theme:hover {
-  background: var(--surface2);
-  color: var(--text);
-  border-color: var(--border-strong);
-}
-.btn-theme svg { width: 16px; height: 16px; pointer-events: none; stroke-width: 1.5; }
-.btn-theme .icon-moon { display: block; }
-.btn-theme .icon-sun  { display: none; }
-[data-theme="dark"] .btn-theme .icon-moon { display: none; }
-[data-theme="dark"] .btn-theme .icon-sun  { display: block; }
-
-/* ── DARK MODE — CSS Variables (Conforme CLAUDE.md) ── */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #000000;
-    --bg-secondary: #0A0A0A;
-    --surface: #0A0A0A;
-    --surface2: #0A0A0A;
-    --border-subtle: #333333;
+    --bg-2: #0A0A0A;
+    --border: #333333;
     --border-strong: #FFFFFF;
     --text: #EDEDED;
-    --text-secondary: #888888;
-    --success: #0070F3;
-    --error: #EE0000;
-    --warning: #F5A623;
+    --text-2: #888888;
+    --overlay: rgba(0, 0, 0, 0.8);
+    --hover: rgba(255, 255, 255, 0.06);
+    --skeleton: #1F1F1F;
+    --backdrop: rgba(0, 0, 0, 0.6);
   }
 }
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #000000;
-  --bg-secondary: #0A0A0A;
-  --surface: #0A0A0A;
-  --surface2: #0A0A0A;
-  --border-subtle: #333333;
+  --bg-2: #0A0A0A;
+  --border: #333333;
   --border-strong: #FFFFFF;
   --text: #EDEDED;
-  --text-secondary: #888888;
-  --success: #0070F3;
-  --error: #EE0000;
-  --warning: #F5A623;
-}
-:root[data-theme="light"] {
-  --bg: #FFFFFF;
-  --bg-secondary: #FAFAFA;
-  --surface: #FFFFFF;
-  --surface2: #FAFAFA;
-  --border-subtle: #EAEAEA;
-  --border-strong: #000000;
-  --text: #000000;
-  --text-secondary: #666666;
-  --success: #0070F3;
-  --error: #EE0000;
-  --warning: #F5A623;
+  --text-2: #888888;
+  --overlay: rgba(0, 0, 0, 0.8);
+  --hover: rgba(255, 255, 255, 0.06);
+  --skeleton: #1F1F1F;
+  --backdrop: rgba(0, 0, 0, 0.6);
 }
 
-/* ── DARK MODE — Element overrides ── */
-@media (prefers-color-scheme: dark) {
-  .header        { background: rgba(0, 0, 0, 0.8); }
-  .output-toolbar { background: rgba(0, 0, 0, 0.8); }
-  .svg-preview   { background: var(--surface); }
-  #pltCanvas     { background: var(--surface); }
-  .modal         { background: rgba(0, 0, 0, 0.8); }
-  #globalTooltip { background: rgba(0, 0, 0, 0.8); }
-  #globalTooltip::before { background: rgba(0, 0, 0, 0.8); }
-  input[type="range"]::-webkit-slider-thumb { background: #EDEDED; }
-  input[type="range"]::-moz-range-thumb     { background: #EDEDED; }
-  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888888' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E"); }
+/* ═══════════════════════════════════════════════
+   BASE
+   ═══════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
-[data-theme="dark"] .header        { background: rgba(0, 0, 0, 0.8); }
-[data-theme="dark"] .output-toolbar { background: rgba(0, 0, 0, 0.8); }
-[data-theme="dark"] .svg-preview   { background: var(--surface); }
-[data-theme="dark"] #pltCanvas     { background: var(--surface); }
-[data-theme="dark"] .modal         { background: rgba(0, 0, 0, 0.8); }
-[data-theme="dark"] #globalTooltip { background: rgba(0, 0, 0, 0.8); }
-[data-theme="dark"] #globalTooltip::before { background: rgba(0, 0, 0, 0.8); }
-[data-theme="dark"] input[type="range"]::-webkit-slider-thumb { background: #EDEDED; }
-[data-theme="dark"] input[type="range"]::-moz-range-thumb     { background: #EDEDED; }
-[data-theme="dark"] select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888888' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E"); }
-[data-theme="light"] .header        { background: rgba(255, 255, 255, 0.8); }
-[data-theme="light"] .output-toolbar { background: rgba(255, 255, 255, 0.8); }
-[data-theme="light"] .svg-preview   { background: var(--surface); }
-[data-theme="light"] #pltCanvas     { background: var(--surface); }
-[data-theme="light"] .modal         { background: rgba(255, 255, 255, 0.8); }
-[data-theme="light"] #globalTooltip { background: rgba(255, 255, 255, 0.8); }
-[data-theme="light"] #globalTooltip::before { background: rgba(255, 255, 255, 0.8); }
-[data-theme="light"] input[type="range"]::-webkit-slider-thumb { background: #000000; }
-[data-theme="light"] input[type="range"]::-moz-range-thumb     { background: #000000; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: none; }
+svg.i { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  opacity: 0.6;
+  line-height: 16px;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--r-full); border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--text-2); }
+
+:focus-visible { outline: 2px solid var(--border-strong); outline-offset: 2px; }
+
+/* ═══════════════════════════════════════════════
+   BUTTONS
+   ═══════════════════════════════════════════════ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--r-full);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  transition: opacity var(--t-micro), background-color var(--t-micro), border-color var(--t-micro), transform var(--t-micro);
+  user-select: none;
+}
+.btn:active:not(:disabled) { transform: scale(0.95); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-lg { height: 40px; padding: 0 24px; }
+.btn-primary { background: var(--text); color: var(--bg); }
+.btn-primary:hover:not(:disabled) { opacity: 0.85; }
+.btn-secondary { border-color: var(--border); color: var(--text); }
+.btn-secondary:hover:not(:disabled) { background: var(--hover); border-color: var(--text-2); }
+.btn-block { width: 100%; }
+.btn kbd { margin-left: 4px; }
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-input);
+  color: var(--text-2);
+  transition: background-color var(--t-micro), color var(--t-micro), transform var(--t-micro);
+  flex-shrink: 0;
+}
+.icon-btn:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.icon-btn:active:not(:disabled) { transform: scale(0.95); }
+.icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.icon-btn[aria-pressed="true"] { color: var(--text); background: var(--hover); }
+.icon-btn.round { border-radius: var(--r-full); border: 1px solid var(--border); }
+
+/* ═══════════════════════════════════════════════
+   TOPBAR
+   ═══════════════════════════════════════════════ */
+.topbar {
+  flex-shrink: 0;
+  height: 56px;
+  border-bottom: 1px solid var(--border);
+  background: var(--overlay);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: relative;
+  z-index: 20;
+}
+.topbar-inner {
+  max-width: 1200px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.brand { display: flex; align-items: center; gap: 8px; text-decoration: none; color: inherit; }
+.brand-mark {
+  width: 24px; height: 24px;
+  border-radius: var(--r-badge);
+  background: var(--text);
+  color: var(--bg);
+  display: grid; place-items: center;
+}
+.brand-mark svg { width: 16px; height: 16px; stroke-width: 2; }
+.brand-name { font-size: 16px; font-weight: 600; letter-spacing: -0.03em; }
+.sep { width: 1px; height: 24px; background: var(--border); transform: rotate(16deg); }
+.topbar-file {
+  font-size: 14px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.topbar-file b { color: var(--text); font-weight: 500; }
+.topbar-spacer { flex: 1; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-badge);
+  white-space: nowrap;
+}
+.badge svg.i { width: 12px; height: 12px; }
+.theme-btn .icon-sun { display: none; }
+:root[data-theme="dark"] .theme-btn .icon-sun { display: block; }
+:root[data-theme="dark"] .theme-btn .icon-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-btn .icon-sun { display: block; }
+  :root:not([data-theme="light"]) .theme-btn .icon-moon { display: none; }
+}
+
+/* ═══════════════════════════════════════════════
+   APP LAYOUT
+   ═══════════════════════════════════════════════ */
+.app {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  border-inline: 1px solid var(--border);
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+}
+.sidebar-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 24px 24px; }
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--overlay);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: grid;
+  gap: 8px;
+}
+.footer-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-2);
+  font-family: var(--mono);
+  min-height: 18px;
+}
+
+/* File card */
+.file-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  margin-bottom: 8px;
+  transition: box-shadow var(--t-micro), border-color var(--t-micro);
+}
+.file-card:hover { box-shadow: var(--shadow-hover); }
+.file-icon {
+  width: 40px; height: 40px;
+  border-radius: var(--r-input);
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  display: grid; place-items: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.file-icon img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+.file-body { flex: 1; min-width: 0; }
+.file-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.01em; }
+.file-meta { font-size: 12px; color: var(--text-2); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-actions { display: flex; gap: 0; }
+.file-empty {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-card);
+  margin-bottom: 8px;
+  text-align: left;
+  color: var(--text-2);
+  transition: border-color var(--t-micro), background-color var(--t-micro);
+}
+.file-empty:hover { border-color: var(--text-2); background: var(--hover); color: var(--text); }
+.file-empty .file-icon { color: var(--text-2); }
+.file-empty b { display: block; color: var(--text); font-weight: 500; }
+.file-empty span { font-size: 12px; }
+
+/* Sections */
+.section { border-bottom: 1px solid var(--border); }
+.section:last-of-type { border-bottom: none; }
+.section > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+  user-select: none;
+  transition: color var(--t-micro);
+}
+.section > summary::-webkit-details-marker { display: none; }
+.section > summary:hover { color: var(--text); }
+.section > summary .chev { margin-left: auto; transition: transform var(--t-micro); }
+.section[open] > summary .chev { transform: rotate(180deg); }
+.section > summary .pill {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 0 6px;
+  border-radius: var(--r-badge);
+  border: 1px solid var(--border);
+  line-height: 18px;
+}
+.section-body { display: grid; gap: 16px; padding-bottom: 24px; }
+.section-body[hidden] { display: none; }
+
+/* Fields */
+.field { display: grid; gap: 8px; min-width: 0; }
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.field-label .value {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.field-hint { font-size: 12px; color: var(--text-2); margin-top: -4px; }
+.field-error { font-size: 12px; color: var(--error); margin-top: -4px; }
+.field-error:empty { display: none; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.control {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  font-size: 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+  outline: none;
+  transition: border-color var(--t-micro), box-shadow var(--t-micro);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.control:hover { border-color: var(--text-2); }
+.control:focus, .control:focus-visible { border-color: var(--border-strong); box-shadow: 0 0 0 1px var(--border-strong); outline: none; }
+.control[aria-invalid="true"] { border-color: var(--error); box-shadow: 0 0 0 1px var(--error); }
+.control:disabled { opacity: 0.5; cursor: not-allowed; }
+input.control[type="number"] { font-family: var(--mono); font-size: 13px; -moz-appearance: textfield; }
+input.control[type="number"]::-webkit-inner-spin-button,
+input.control[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.input-unit { position: relative; }
+.input-unit .control { padding-right: 40px; }
+.input-unit .unit {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+  pointer-events: none;
+}
+.input-unit .unit-prefix {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  font-size: 12px; font-weight: 500; color: var(--text-2); pointer-events: none;
+}
+.input-unit.has-prefix .control { padding-left: 32px; }
+.select-wrap { position: relative; }
+.select-wrap .control { padding-right: 40px; cursor: pointer; }
+.select-wrap svg.i { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-2); pointer-events: none; }
+select.control option { background: var(--bg); color: var(--text); }
+
+/* Segmented */
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+}
+.segmented label { flex: 1; position: relative; min-width: 0; }
+.segmented input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.segmented span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  border-radius: var(--r-badge);
+  white-space: nowrap;
+  transition: background-color var(--t-micro), color var(--t-micro), box-shadow var(--t-micro);
+}
+.segmented label:hover span { color: var(--text); }
+.segmented input:checked + span { background: var(--bg); color: var(--text); box-shadow: 0 0 0 1px var(--border); }
+.segmented input:focus-visible + span { outline: 2px solid var(--border-strong); outline-offset: 1px; }
+.segmented input:disabled + span { opacity: 0.5; }
+
+/* Switch */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  user-select: none;
+}
+.switch-row .switch-text { display: grid; }
+.switch-row .switch-text b { font-weight: 500; font-size: 13px; }
+.switch-row .switch-text small { font-size: 12px; color: var(--text-2); }
+.switch {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  background: var(--border);
+  cursor: pointer;
+  transition: background-color var(--t-micro);
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  border-radius: var(--r-full);
+  background: var(--bg);
+  transition: transform var(--t-micro);
+}
+:root[data-theme="dark"] .switch:not(:checked)::after { background: var(--text-2); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .switch:not(:checked)::after { background: var(--text-2); } }
+.switch:checked { background: var(--text); }
+.switch:checked::after { transform: translateX(16px); }
+.switch:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Range */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+  --pct: 50%;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(to right, var(--text) var(--pct), var(--border) var(--pct));
+}
+input[type="range"]::-moz-range-track { height: 2px; border-radius: 1px; background: var(--border); }
+input[type="range"]::-moz-range-progress { height: 2px; border-radius: 1px; background: var(--text); }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  margin-top: -7px;
+  border-radius: var(--r-full);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  transition: transform var(--t-micro);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: var(--r-full);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+}
+input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.15); }
+input[type="range"]:active::-webkit-slider-thumb { transform: scale(0.95); }
+input[type="range"]:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Info tip */
+.tip-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--text-2);
+  border-radius: var(--r-full);
+  cursor: help;
+  transition: color var(--t-micro);
+}
+.tip-btn svg.i { width: 14px; height: 14px; }
+.tip-btn:hover { color: var(--text); }
+#tooltip {
+  position: fixed;
+  z-index: 300;
+  max-width: 280px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--overlay);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--t-micro), transform var(--t-micro);
+}
+#tooltip.visible { opacity: 1; transform: none; }
+
+/* Hatch preview */
+.hatch-preview {
+  height: 80px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+  background: var(--bg-2);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.hatch-preview svg { width: 100%; height: 100%; }
+fieldset { border: none; min-width: 0; display: grid; gap: 16px; }
+fieldset:disabled .field, fieldset:disabled .switch-row, fieldset:disabled .hatch-preview { opacity: 0.4; pointer-events: none; }
+
+.preset-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* ── Workspace ── */
+.workspace { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg-2); }
+.ws-toolbar {
+  flex-shrink: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ws-toolbar::-webkit-scrollbar { display: none; }
+.tabs { display: flex; gap: 4px; height: 100%; }
+.tab {
+  position: relative;
+  height: 100%;
+  padding: 0 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-2);
+  transition: color var(--t-micro);
+  white-space: nowrap;
+}
+.tab::after {
+  content: '';
+  position: absolute;
+  left: 8px; right: 8px; bottom: -1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text);
+  transform: scaleX(0);
+  transition: transform var(--t-micro);
+}
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] { color: var(--text); }
+.tab[aria-selected="true"]::after { transform: scaleX(1); }
+.tab:focus-visible { outline-offset: -2px; border-radius: var(--r-badge); }
+.tab:disabled { opacity: 0.5; cursor: not-allowed; }
+.toolbar-group { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.toolbar-group[hidden] { display: none; }
+.zoom-val {
+  min-width: 48px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.vsep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
+
+/* Issues */
+.issues { flex-shrink: 0; display: grid; }
+.issues:empty { display: none; }
+.issue {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  animation: slide-down 200ms var(--ease-out);
+}
+.issue svg.i { margin-top: 2px; }
+.issue.warn svg.i { color: var(--warning); }
+.issue.error svg.i { color: var(--error); }
+.issue.error { color: var(--error); }
+.issue.info svg.i { color: var(--success); }
+@keyframes slide-down { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+.ws-body { position: relative; flex: 1; min-height: 0; }
+.panel { position: absolute; inset: 0; }
+.panel[hidden] { display: none; }
+
+/* Preview canvas */
+#viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+#viewport.panning { cursor: grabbing; }
+#viewport canvas { display: block; width: 100%; height: 100%; }
+.hud {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 12px;
+  height: 32px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--overlay);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+  pointer-events: none;
+}
+.hud-coords { left: 16px; bottom: 16px; min-width: 160px; }
+.hud-legend { right: 16px; bottom: 16px; }
+.legend-item { display: inline-flex; align-items: center; gap: 8px; }
+.legend-line { width: 16px; height: 0; border-top: 1.5px solid var(--text); }
+.legend-line.dash { border-top: 1.5px dashed var(--success); }
+.sim {
+  position: absolute;
+  left: 50%;
+  top: 16px;
+  transform: translateX(-50%);
+  width: min(400px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  height: 40px;
+  background: var(--overlay);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+}
+.sim[hidden] { display: none; }
+.sim label { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
+.sim output { font-family: var(--mono); font-size: 12px; min-width: 40px; text-align: right; }
+.sim .icon-btn { width: 24px; height: 24px; border-radius: var(--r-full); }
+
+/* Skeleton */
+.skeleton-layer {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  background: var(--bg-2);
+  z-index: 2;
+}
+.is-busy .skeleton-layer { display: grid; }
+.skel { background: var(--skeleton); border-radius: var(--r-badge); animation: pulse 1.5s ease-in-out infinite; }
+.skel-page { width: min(320px, 60%); aspect-ratio: 210 / 297; max-height: 80%; border-radius: 2px; display: grid; place-items: center; }
+.skel-page::after { content: ''; width: 50%; height: 30%; border-radius: var(--r-badge); background: var(--bg-2); opacity: 0.6; }
+.skel-text { display: inline-block; width: 40px; height: 12px; vertical-align: middle; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+/* Empty state */
+.empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 3;
+  background: var(--bg-2);
+}
+.empty[hidden] { display: none; }
+.empty-card {
+  width: min(480px, 100%);
+  padding: 48px 32px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-card);
+  background: var(--bg);
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: border-color var(--t-micro), box-shadow var(--t-micro);
+  animation: rise 300ms var(--spring);
+}
+.empty-card:hover { border-color: var(--text-2); box-shadow: var(--shadow-hover); }
+.empty-icon {
+  width: 48px; height: 48px;
+  display: grid; place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--bg-2);
+}
+.empty-icon svg.i { width: 24px; height: 24px; }
+.empty h2 { font-size: 24px; font-weight: 600; line-height: 1.2; letter-spacing: -0.03em; }
+.empty p { color: var(--text-2); max-width: 320px; }
+.empty-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.empty-foot { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--text-2); margin-top: 8px; }
+.empty-foot svg.i { width: 14px; height: 14px; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* Code panel */
+.code-panel { overflow: auto; background: var(--bg); }
+.code {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 20px;
+  padding: 16px 0;
+  counter-reset: ln;
+  min-width: max-content;
+}
+.code .ln { display: block; padding: 0 24px 0 0; white-space: pre; }
+.code .ln::before {
+  counter-increment: ln;
+  content: counter(ln);
+  display: inline-block;
+  width: 64px;
+  padding-right: 16px;
+  text-align: right;
+  color: var(--text-2);
+  opacity: 0.5;
+  user-select: none;
+}
+.code .ln:hover { background: var(--hover); }
+.tk-init { color: var(--success); }
+.tk-pu { color: var(--text-2); }
+.tk-pd { color: var(--text); }
+.code-note { padding: 16px 24px 24px 88px; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+
+/* Source panel */
+.source-panel { display: grid; place-items: center; padding: 32px; overflow: auto; }
+.source-frame {
+  max-width: 100%;
+  max-height: 100%;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background-color: #FFFFFF;
+  background-image: linear-gradient(45deg, #F2F2F2 25%, transparent 25%), linear-gradient(-45deg, #F2F2F2 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #F2F2F2 75%), linear-gradient(-45deg, transparent 75%, #F2F2F2 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+.source-frame img { display: block; max-width: 100%; max-height: calc(100dvh - 320px); min-width: 64px; }
+
+/* Status bar */
+.statusbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.statusbar::-webkit-scrollbar { display: none; }
+.stat {
+  display: grid;
+  gap: 0;
+  padding: 8px 16px;
+  border-right: 1px solid var(--border);
+  min-width: max-content;
+}
+.stat:last-child { border-right: none; }
+.stat dt { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
+.stat dd { font-family: var(--mono); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.stat dd.muted { color: var(--text-2); }
+
+/* Drop overlay */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: grid;
+  place-items: center;
+  background: var(--overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms var(--ease-out);
+}
+.drop-overlay.visible { opacity: 1; }
+.drop-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-card);
+}
+.drop-overlay-inner { display: grid; justify-items: center; gap: 16px; text-align: center; transform: translateY(8px); transition: transform 200ms var(--spring); }
+.drop-overlay.visible .drop-overlay-inner { transform: none; }
+.drop-overlay h2 { font-size: 32px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.2; }
+.drop-overlay p { color: var(--text-2); }
+
+/* Toasts */
+.toasts {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 500;
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 360px;
+  padding: 12px 16px;
+  font-size: 14px;
+  background: var(--overlay);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-hover);
+  pointer-events: auto;
+  animation: toast-in 250ms var(--spring);
+}
+.toast.out { animation: toast-out 200ms var(--ease-out) forwards; }
+.toast.success svg.i { color: var(--success); }
+.toast.error svg.i { color: var(--error); }
+.toast.warn svg.i { color: var(--warning); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateY(4px); } }
+
+/* Dialog */
+dialog.sheet {
+  margin: auto;
+  width: min(400px, calc(100% - 32px));
+  padding: 24px;
+  color: var(--text);
+  background: var(--overlay);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+}
+dialog.sheet[open] { animation: rise 250ms var(--spring); }
+dialog.sheet::backdrop { background: var(--backdrop); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+dialog.sheet h3 { font-size: 20px; font-weight: 600; line-height: 1.3; letter-spacing: -0.02em; }
+dialog.sheet p { color: var(--text-2); margin-top: 4px; }
+dialog.sheet form { display: grid; gap: 24px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.shortcuts { display: grid; gap: 8px; }
+.shortcuts div { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 14px; }
+.shortcuts kbd { opacity: 1; color: var(--text-2); border-color: var(--border); padding: 0 6px; line-height: 20px; }
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════ */
+@media (max-width: 960px) {
+  .app { grid-template-columns: 320px minmax(0, 1fr); }
+  .sidebar-scroll, .sidebar-footer { padding-left: 16px; padding-right: 16px; }
+  .hide-md { display: none !important; }
+}
+@media (max-width: 760px) {
+  body { height: auto; min-height: 100dvh; overflow: auto; }
+  .topbar { position: sticky; top: 0; }
+  .topbar-inner { padding: 0 16px; gap: 8px; }
+  .hide-sm { display: none !important; }
+  .app { display: flex; flex-direction: column; border-inline: none; }
+  .workspace { order: -1; height: 64svh; min-height: 400px; border-bottom: 1px solid var(--border); }
+  .sidebar { border-right: none; }
+  .sidebar-scroll { overflow: visible; padding: 8px 16px 24px; }
+  .sidebar-footer { position: sticky; bottom: 0; z-index: 10; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .hud-legend { display: none; }
+  .hud-coords { left: 8px; bottom: 8px; min-width: 0; }
+  .sim { top: 8px; }
+  .toasts { left: 16px; right: 16px; bottom: 96px; justify-items: stretch; }
+  .toast { max-width: none; }
+  .code-note { padding-left: 24px; }
+  /* Modale → Bottom sheet */
+  dialog.sheet {
+    margin: auto 0 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--r-card) var(--r-card) 0 0;
+    border-bottom: none;
+    padding: 24px 16px max(24px, env(safe-area-inset-bottom));
+  }
+  dialog.sheet[open] { animation: sheet-up 300ms var(--spring); }
+  .dialog-actions .btn { flex: 1; }
+}
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<header class="header">
-  <div class="logo"></div>
-  <div class="header-title">
-    <h1>LASERPLOT</h1>
-    <span>Convertisseur SVG vers PLT (HPGL/2)</span>
+<!-- ═════════════ TOPBAR ═════════════ -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="./" aria-label="Laserplot — accueil">
+      <span class="brand-mark"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg></span>
+      <span class="brand-name">Laserplot</span>
+    </a>
+    <span class="sep hide-sm" aria-hidden="true"></span>
+    <span class="topbar-file hide-sm" id="topbarFile">SVG → PLT · HPGL</span>
+    <span class="topbar-spacer"></span>
+    <span class="badge hide-md" title="Aucun fichier n'est envoyé sur un serveur"><i data-icon="shield"></i>100% local</span>
+    <button class="icon-btn hide-sm" id="btnShortcuts" type="button" aria-label="Raccourcis clavier" title="Raccourcis clavier (?)"><i data-icon="keyboard"></i></button>
+    <button class="icon-btn round theme-btn" id="btnTheme" type="button" aria-label="Basculer le thème clair / sombre" title="Thème">
+      <i data-icon="moon" class="icon-moon"></i><i data-icon="sun" class="icon-sun"></i>
+    </button>
   </div>
-  <div class="header-badge">HPGL/2 · LOCAL · NO UPLOAD</div>
-  <button class="btn-theme" id="btnTheme" aria-label="Basculer le thème sombre/clair">
-    <!-- Moon icon (shown in light mode) -->
-    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-    </svg>
-    <!-- Sun icon (shown in dark mode) -->
-    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="5"/>
-      <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-      <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-    </svg>
-  </button>
 </header>
 
-<!-- MAIN -->
-<div class="main">
+<!-- ═════════════ APP ═════════════ -->
+<main class="app">
 
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" aria-label="Paramètres">
+    <div class="sidebar-scroll">
+      <input type="file" id="fileInput" accept=".svg,image/svg+xml" hidden>
+      <input type="file" id="presetInput" accept=".json,application/json" hidden>
 
-    <!-- Presets -->
-    <div class="section-label">Presets</div>
-    <div class="preset-btns">
-      <button class="btn-preset" id="btnSavePreset" aria-label="Sauvegarder le preset">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Sauvegarder
+      <button class="file-empty" id="fileEmpty" type="button">
+        <span class="file-icon"><i data-icon="upload"></i></span>
+        <span><b>Importer un SVG</b><span>Glisser-déposer ou cliquer pour parcourir</span></span>
       </button>
-      <button class="btn-preset" id="btnLoadPreset" aria-label="Charger un preset">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Charger
+      <div class="file-card" id="fileCard" hidden>
+        <span class="file-icon"><img id="fileThumb" alt=""></span>
+        <div class="file-body">
+          <div class="file-name" id="fileName"></div>
+          <div class="file-meta" id="fileMeta"></div>
+        </div>
+        <div class="file-actions">
+          <button class="icon-btn" id="btnReplace" type="button" aria-label="Remplacer le fichier" title="Remplacer"><i data-icon="replace"></i></button>
+          <button class="icon-btn" id="btnRemove" type="button" aria-label="Retirer le fichier" title="Retirer"><i data-icon="x"></i></button>
+        </div>
+      </div>
+
+      <form id="settings" autocomplete="off" novalidate>
+
+        <!-- Page -->
+        <details class="section" open>
+          <summary>Page <span class="pill" id="pagePill">A4</span><i data-icon="chevron" class="chev"></i></summary>
+          <div class="section-body">
+            <div class="field">
+              <label class="field-label" for="pageFormat">Format</label>
+              <div class="select-wrap">
+                <select class="control" id="pageFormat" name="pageFormat">
+                  <option value="a5">A5 — 148 × 210 mm</option>
+                  <option value="a4">A4 — 210 × 297 mm</option>
+                  <option value="a3">A3 — 297 × 420 mm</option>
+                  <option value="a2">A2 — 420 × 594 mm</option>
+                  <option value="a1">A1 — 594 × 841 mm</option>
+                  <option value="a0">A0 — 841 × 1189 mm</option>
+                  <option value="letter">Letter — 216 × 279 mm</option>
+                  <option value="custom">Personnalisé</option>
+                </select>
+                <i data-icon="chevron"></i>
+              </div>
+            </div>
+            <div class="segmented" role="radiogroup" aria-label="Orientation">
+              <label><input type="radio" name="orientation" value="portrait" checked><span>Portrait</span></label>
+              <label><input type="radio" name="orientation" value="landscape"><span>Paysage</span></label>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label class="field-label" for="pageW">Largeur</label>
+                <div class="input-unit"><input class="control" type="number" id="pageW" name="pageW" value="210" min="1" step="1" inputmode="decimal"><span class="unit">mm</span></div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="pageH">Hauteur</label>
+                <div class="input-unit"><input class="control" type="number" id="pageH" name="pageH" value="297" min="1" step="1" inputmode="decimal"><span class="unit">mm</span></div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="margin">Marge
+                <button type="button" class="tip-btn" data-tip="Zone de sécurité autour du tracé. 5 à 10 mm sont recommandés pour la plupart des graveurs laser." aria-label="Aide : marge"><i data-icon="info"></i></button>
+              </label>
+              <div class="input-unit"><input class="control" type="number" id="margin" name="margin" value="5" min="0" step="0.5" inputmode="decimal"><span class="unit">mm</span></div>
+              <div class="field-error" id="pageError"></div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Placement -->
+        <details class="section" open>
+          <summary>Placement<i data-icon="chevron" class="chev"></i></summary>
+          <div class="section-body">
+            <div class="field">
+              <span class="field-label">Échelle
+                <button type="button" class="tip-btn" data-tip="Ajuster : remplit la zone utile en conservant les proportions. Réelle : respecte les dimensions physiques du SVG (width/height). Personnalisée : pourcentage de la taille réelle." aria-label="Aide : échelle"><i data-icon="info"></i></button>
+              </span>
+              <div class="segmented" role="radiogroup" aria-label="Échelle">
+                <label><input type="radio" name="scaleMode" value="fit" checked><span>Ajuster</span></label>
+                <label><input type="radio" name="scaleMode" value="real"><span>Réelle</span></label>
+                <label><input type="radio" name="scaleMode" value="custom"><span>Perso.</span></label>
+              </div>
+            </div>
+            <div class="field" id="scalePctField" hidden>
+              <label class="field-label" for="scalePct">Facteur d'échelle</label>
+              <div class="input-unit"><input class="control" type="number" id="scalePct" name="scalePct" value="100" min="1" step="1" inputmode="decimal"><span class="unit">%</span></div>
+            </div>
+            <div class="field">
+              <span class="field-label">Alignement</span>
+              <div class="segmented" role="radiogroup" aria-label="Alignement">
+                <label><input type="radio" name="align" value="center" checked><span>Centré</span></label>
+                <label><input type="radio" name="align" value="top-left"><span>Haut-gauche</span></label>
+                <label><input type="radio" name="align" value="bottom-left"><span>Bas-gauche</span></label>
+              </div>
+            </div>
+            <div class="field">
+              <span class="field-label">Rotation</span>
+              <div class="segmented" role="radiogroup" aria-label="Rotation">
+                <label><input type="radio" name="rotation" value="0" checked><span>0°</span></label>
+                <label><input type="radio" name="rotation" value="90"><span>90°</span></label>
+                <label><input type="radio" name="rotation" value="180"><span>180°</span></label>
+                <label><input type="radio" name="rotation" value="270"><span>270°</span></label>
+              </div>
+            </div>
+            <label class="switch-row">
+              <span class="switch-text"><b>Miroir horizontal</b><small>Pour la gravure par l'arrière (verre, acrylique)</small></span>
+              <input type="checkbox" class="switch" name="mirror">
+            </label>
+          </div>
+        </details>
+
+        <!-- Tracé -->
+        <details class="section" open>
+          <summary>Tracé<i data-icon="chevron" class="chev"></i></summary>
+          <div class="section-body">
+            <div class="field">
+              <label class="field-label" for="curveRes">Résolution des courbes
+                <button type="button" class="tip-btn" data-tip="Nombre de segments utilisés pour approximer chaque courbe de Bézier ou arc. Bas : fichier léger, rendu anguleux. Haut : rendu lisse, fichier plus lourd." aria-label="Aide : résolution"><i data-icon="info"></i></button>
+                <output class="value" for="curveRes" id="curveResOut">32</output>
+              </label>
+              <input type="range" id="curveRes" name="curveRes" min="8" max="128" step="8" value="32">
+            </div>
+            <label class="switch-row">
+              <span class="switch-text"><b>Optimiser les déplacements</b><small>Réordonne les tracés pour réduire les trajets à vide</small></span>
+              <input type="checkbox" class="switch" name="optimize" checked>
+            </label>
+            <div class="row">
+              <div class="field">
+                <label class="field-label" for="speedDraw">Vit. gravure
+                  <button type="button" class="tip-btn" data-tip="Vitesses utilisées uniquement pour estimer la durée du travail. Elles ne sont pas écrites dans le fichier PLT." aria-label="Aide : vitesses"><i data-icon="info"></i></button>
+                </label>
+                <div class="input-unit"><input class="control" type="number" id="speedDraw" name="speedDraw" value="20" min="0.1" step="1" inputmode="decimal"><span class="unit">mm/s</span></div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="speedTravel">Vit. à vide</label>
+                <div class="input-unit"><input class="control" type="number" id="speedTravel" name="speedTravel" value="150" min="0.1" step="1" inputmode="decimal"><span class="unit">mm/s</span></div>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Remplissage -->
+        <details class="section" open>
+          <summary>Remplissage <span class="pill" id="hatchPill">Off</span><i data-icon="chevron" class="chev"></i></summary>
+          <div class="section-body">
+            <label class="switch-row">
+              <span class="switch-text"><b>Hachurer les formes fermées</b><small>Remplit l'intérieur des formes par des lignes</small></span>
+              <input type="checkbox" class="switch" name="hatchEnable" id="hatchEnable">
+            </label>
+            <fieldset id="hatchFields" disabled>
+              <div class="hatch-preview" aria-hidden="true">
+                <svg id="hatchPreview" viewBox="0 0 240 80" preserveAspectRatio="xMidYMid meet"></svg>
+              </div>
+              <div class="field">
+                <span class="field-label">Motif</span>
+                <div class="segmented" role="radiogroup" aria-label="Motif">
+                  <label><input type="radio" name="hatchType" value="lines" checked><span>Lignes</span></label>
+                  <label><input type="radio" name="hatchType" value="cross"><span>Croisées</span></label>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="hatchSpacing">Espacement
+                  <button type="button" class="tip-btn" data-tip="Distance entre deux lignes de hachure. Fin (0,1–0,3 mm) : remplissage dense. Large (1–3 mm) : motif aéré." aria-label="Aide : espacement"><i data-icon="info"></i></button>
+                  <output class="value" for="hatchSpacing" id="hatchSpacingOut">0,5 mm</output>
+                </label>
+                <input type="range" id="hatchSpacing" name="hatchSpacing" min="0.1" max="3" step="0.1" value="0.5">
+              </div>
+              <div class="field">
+                <label class="field-label" for="hatchAngle">Angle
+                  <output class="value" for="hatchAngle" id="hatchAngleOut">45°</output>
+                </label>
+                <input type="range" id="hatchAngle" name="hatchAngle" min="0" max="175" step="5" value="45">
+              </div>
+              <label class="switch-row">
+                <span class="switch-text"><b>Conserver les contours</b></span>
+                <input type="checkbox" class="switch" name="hatchContoursAlso" checked>
+              </label>
+              <label class="switch-row">
+                <span class="switch-text"><b>Trajet bidirectionnel</b><small>Aller-retour en serpentin, plus rapide</small></span>
+                <input type="checkbox" class="switch" name="hatchBidirectional" checked>
+              </label>
+            </fieldset>
+          </div>
+        </details>
+
+        <!-- Presets -->
+        <details class="section">
+          <summary>Presets<i data-icon="chevron" class="chev"></i></summary>
+          <div class="section-body">
+            <div class="preset-row">
+              <button class="btn btn-secondary" type="button" id="btnSavePreset"><i data-icon="save"></i>Exporter</button>
+              <button class="btn btn-secondary" type="button" id="btnLoadPreset"><i data-icon="folder"></i>Importer</button>
+            </div>
+            <button class="btn btn-secondary" type="button" id="btnResetSettings"><i data-icon="reset"></i>Réinitialiser les paramètres</button>
+            <p class="field-hint">Vos réglages sont mémorisés automatiquement dans ce navigateur.</p>
+          </div>
+        </details>
+      </form>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="btn btn-primary btn-lg btn-block" id="btnDownload" type="button" disabled>
+        <i data-icon="download"></i>Télécharger le .PLT
       </button>
-      <input type="file" id="presetFileInput" accept=".json" style="display:none">
+      <div class="footer-meta"><span id="footerName">Aucun fichier</span><span id="footerSize"></span></div>
     </div>
-
-    <!-- Fichier source -->
-    <div class="section-label">Fichier source</div>
-    <div class="dropzone" id="dropzone" role="button" aria-label="Sélectionner un fichier SVG">
-      <input type="file" id="fileInput" accept=".svg" aria-label="Choisir un fichier SVG">
-      <div class="dropzone-text">
-        Glisser un fichier <strong>.SVG</strong> ici<br>ou cliquer pour parcourir
-      </div>
-    </div>
-    <div class="file-info" id="fileInfo">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      <span id="fileName"></span>
-    </div>
-
-    <!-- Format de sortie -->
-    <div class="section-label">Format de sortie</div>
-    <label class="field-label" for="pageFormat">
-      Format page
-      <button type="button" class="info-btn" tabindex="0" data-tooltip="FORMAT DE PAGE|||Sélectionnez un format standard ou choisissez « Personnalisé » pour entrer vos propres dimensions." aria-label="Info format de page">i</button>
-    </label>
-    <select id="pageFormat">
-      <option value="custom">Personnalisé</option>
-      <option value="a4" selected>A4 (210 × 297 mm)</option>
-      <option value="a3">A3 (297 × 420 mm)</option>
-      <option value="a2">A2 (420 × 594 mm)</option>
-      <option value="letter">Letter (216 × 279 mm)</option>
-    </select>
-
-    <div class="row-2">
-      <div>
-        <label class="field-label" for="pageW">Largeur (mm)</label>
-        <input type="number" id="pageW" value="210" min="1">
-      </div>
-      <div>
-        <label class="field-label" for="pageH">Hauteur (mm)</label>
-        <input type="number" id="pageH" value="297" min="1">
-      </div>
-    </div>
-
-    <label class="field-label" for="margin">
-      Marge (mm)
-      <button type="button" class="info-btn" tabindex="0" data-tooltip="MARGE|||Espace de sécurité en millimètres autour de la zone de gravure. Recommandé : 5-10 mm pour les graveurs laser." aria-label="Info marge">i</button>
-    </label>
-    <input type="number" id="margin" value="5" min="0">
-
-    <label class="check-row">
-      <input type="checkbox" id="fitPage" checked>
-      Mise à l'échelle automatique
-    </label>
-
-    <!-- Paramètres HPGL -->
-    <div class="section-label">Paramètres HPGL</div>
-    <label class="field-label" for="curveRes">
-      Résolution des courbes
-      <button type="button" class="info-btn" tabindex="0" data-tooltip="RÉSOLUTION COURBES|||Nombre de segments utilisés pour approximer chaque courbe de Bézier ou arc. <br>Bas (8-16) : fichier léger, rendu anguleux.<br>Haut (64-128) : rendu lisse, fichier plus lourd." aria-label="Info résolution des courbes">i</button>
-    </label>
-    <div class="range-row">
-      <input type="range" id="curveRes" min="8" max="128" step="8" value="32">
-      <span class="range-val" id="curveResVal">32</span>
-    </div>
-
-    <!-- Hachures -->
-    <div class="section-label">Remplissage (hachures)</div>
-    <label class="check-row">
-      <input type="checkbox" id="hatchEnable">
-      Activer le remplissage
-    </label>
-
-    <div id="hatchPanel" class="hatch-disabled">
-      <div class="hatch-preview-box">
-        <svg id="hatchPreviewSvg" viewBox="0 0 200 76" xmlns="http://www.w3.org/2000/svg">
-          <rect x="20" y="8" width="160" height="60" fill="none" stroke="var(--text)" stroke-width="1.5"/>
-        </svg>
-      </div>
-
-      <label class="field-label" for="hatchType">Type de remplissage</label>
-      <select id="hatchType">
-        <option value="lines">Lignes parallèles</option>
-        <option value="cross">Croisées (Crosshatch)</option>
-      </select>
-
-      <label class="field-label" for="hatchSpacing">
-        Espacement des lignes (mm)
-        <button type="button" class="info-btn" tabindex="0" data-tooltip="ESPACEMENT|||Distance entre chaque ligne de hachure en millimètres. Un espacement fin (0.1-0.3) donne un remplissage dense, un espacement large (1-3) un motif aéré." aria-label="Info espacement">i</button>
-      </label>
-      <div class="range-row">
-        <input type="range" id="hatchSpacing" min="0.1" max="3" step="0.1" value="0.5">
-        <span class="range-val" id="hatchSpacingVal">0.5</span>
-      </div>
-
-      <label class="field-label" for="hatchAngle">Angle des lignes (deg)</label>
-      <div class="range-row">
-        <input type="range" id="hatchAngle" min="0" max="175" step="5" value="45">
-        <span class="range-val" id="hatchAngleVal">45°</span>
-      </div>
-
-      <label class="check-row">
-        <input type="checkbox" id="hatchContoursAlso" checked>
-        Conserver les contours
-      </label>
-      <label class="check-row">
-        <input type="checkbox" id="hatchBidirectional" checked>
-        Trajet bidirectionnel
-      </label>
-    </div>
-
-    <button class="btn-convert" id="btnConvert" disabled>Convertir en PLT</button>
   </aside>
 
-  <!-- OUTPUT PANEL -->
-  <section class="output-panel">
-    <div class="output-toolbar">
-      <h2>Output .PLT</h2>
-      <button class="btn-download" id="btnDownload" aria-label="Télécharger le fichier PLT">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Télécharger .PLT
-      </button>
+  <!-- ── WORKSPACE ── -->
+  <section class="workspace" aria-label="Résultat">
+    <div class="ws-toolbar">
+      <div class="tabs" role="tablist" aria-label="Vues">
+        <button class="tab" role="tab" id="tab-preview" aria-controls="panel-preview" aria-selected="true" data-tab="preview">Aperçu</button>
+        <button class="tab" role="tab" id="tab-code" aria-controls="panel-code" aria-selected="false" data-tab="code" tabindex="-1">Code HPGL</button>
+        <button class="tab" role="tab" id="tab-source" aria-controls="panel-source" aria-selected="false" data-tab="source" tabindex="-1">SVG source</button>
+      </div>
+      <div class="toolbar-group" id="tools-preview">
+        <button class="icon-btn" type="button" id="btnSim" aria-pressed="false" aria-label="Simulation du tracé" title="Simulation du tracé"><i data-icon="play"></i></button>
+        <button class="icon-btn" type="button" id="btnTravel" aria-pressed="true" aria-label="Afficher les déplacements à vide" title="Déplacements à vide"><i data-icon="route"></i></button>
+        <span class="vsep"></span>
+        <button class="icon-btn" type="button" id="btnZoomOut" aria-label="Zoom arrière" title="Zoom arrière (−)"><i data-icon="minus"></i></button>
+        <span class="zoom-val" id="zoomVal">100%</span>
+        <button class="icon-btn" type="button" id="btnZoomIn" aria-label="Zoom avant" title="Zoom avant (+)"><i data-icon="plus"></i></button>
+        <button class="icon-btn" type="button" id="btnFit" aria-label="Ajuster à la vue" title="Ajuster à la vue (F)"><i data-icon="fit"></i></button>
+      </div>
+      <div class="toolbar-group" id="tools-code" hidden>
+        <button class="btn btn-secondary" type="button" id="btnCopy"><i data-icon="copy"></i>Copier</button>
+      </div>
     </div>
-    <div class="stats-bar" id="statsBar">
-      <div class="stat-item">Commandes <span id="statCmds">0</span></div>
-      <div class="stat-item">Dist. gravure <span id="statDist">0 mm</span></div>
-      <div class="stat-item">Éléments <span id="statElems">0</span></div>
-      <div class="stat-item">Hachures <span id="statHatch">0</span></div>
-      <div class="stat-item">Taille <span id="statSize">0 Ko</span></div>
-    </div>
-    <div class="output-content">
-      <div class="placeholder" id="placeholder">
-        <div class="placeholder-grid">
-          <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
-          <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
-          <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
-          <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
-          <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
+
+    <div class="issues" id="issues" aria-live="polite"></div>
+
+    <div class="ws-body" id="wsBody">
+      <div class="panel" id="panel-preview" role="tabpanel" aria-labelledby="tab-preview">
+        <div id="viewport" aria-label="Aperçu du tracé. Molette pour zoomer, glisser pour déplacer, double-clic pour ajuster.">
+          <canvas id="canvas"></canvas>
         </div>
-        <p>Chargez un fichier SVG<br>pour commencer la conversion</p>
+        <div class="sim" id="sim" hidden>
+          <button class="icon-btn" type="button" id="btnSimPlay" aria-label="Lecture"><i data-icon="play"></i></button>
+          <label for="simRange">Progression</label>
+          <input type="range" id="simRange" min="0" max="1000" value="1000">
+          <output id="simOut" for="simRange">100%</output>
+        </div>
+        <div class="hud hud-coords" id="hudCoords" aria-hidden="true">X — · Y —</div>
+        <div class="hud hud-legend" aria-hidden="true">
+          <span class="legend-item"><span class="legend-line"></span>Gravure</span>
+          <span class="legend-item"><span class="legend-line dash"></span>À vide</span>
+        </div>
+        <div class="skeleton-layer" aria-hidden="true"><div class="skel skel-page"></div></div>
+
+        <div class="empty" id="empty">
+          <div class="empty-card" id="emptyCard" role="button" tabindex="0" aria-label="Importer un fichier SVG">
+            <span class="empty-icon"><i data-icon="upload"></i></span>
+            <h2>Déposez un fichier SVG</h2>
+            <p>Convertissez vos dessins vectoriels en PLT (HPGL) prêts pour votre graveur laser ou traceur.</p>
+            <div class="empty-actions">
+              <button class="btn btn-primary" type="button" id="btnBrowse">Parcourir</button>
+              <button class="btn btn-secondary" type="button" id="btnSample"><i data-icon="shapes"></i>Essayer un exemple</button>
+            </div>
+            <span class="empty-foot"><i data-icon="shield"></i>Traitement 100% local — rien n'est envoyé en ligne</span>
+          </div>
+        </div>
       </div>
 
-      <div class="alert alert-warn" id="alertText" role="alert" aria-live="polite"></div>
-      <div class="alert alert-warn" id="alertHatch" role="alert" aria-live="polite"></div>
-      <div class="alert alert-success" id="alertSuccess" role="alert" aria-live="polite"></div>
-      <div class="alert alert-error" id="alertError" role="alert" aria-live="polite"></div>
-      <div class="svg-preview" id="svgPreview"></div>
-      <div class="plt-preview" id="pltPreview">
-        <div class="plt-view-toggle" id="pltViewToggle">
-          <button class="toggle-btn active" data-view="canvas">VISUEL</button>
-          <button class="toggle-btn" data-view="text">TEXTE</button>
-        </div>
-        <canvas id="pltCanvas" width="800" height="500"></canvas>
-        <pre id="pltCode"></pre>
+      <div class="panel code-panel" id="panel-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+        <pre class="code" id="code"></pre>
+        <div class="code-note" id="codeNote"></div>
+      </div>
+
+      <div class="panel source-panel" id="panel-source" role="tabpanel" aria-labelledby="tab-source" hidden>
+        <div class="source-frame"><img id="sourceImg" alt="Aperçu du fichier SVG source"></div>
       </div>
     </div>
+
+    <dl class="statusbar" id="statusbar">
+      <div class="stat"><dt>Sortie</dt><dd id="statOut" class="muted">—</dd></div>
+      <div class="stat"><dt>Durée est.</dt><dd id="statTime" class="muted">—</dd></div>
+      <div class="stat"><dt>Gravure</dt><dd id="statDraw" class="muted">—</dd></div>
+      <div class="stat"><dt>À vide</dt><dd id="statTravel" class="muted">—</dd></div>
+      <div class="stat"><dt>Éléments</dt><dd id="statElems" class="muted">—</dd></div>
+      <div class="stat"><dt>Hachures</dt><dd id="statHatch" class="muted">—</dd></div>
+      <div class="stat"><dt>Commandes</dt><dd id="statCmds" class="muted">—</dd></div>
+      <div class="stat"><dt>Taille</dt><dd id="statSize" class="muted">—</dd></div>
+    </dl>
   </section>
-</div>
+</main>
 
-<!-- MODAL -->
-<div class="modal-overlay" id="modalOverlay">
-  <div class="modal">
-    <h3>Sauvegarder le preset</h3>
-    <input type="text" id="presetName" placeholder="Nom du preset…">
-    <div class="modal-btns">
-      <button id="modalCancel">Annuler</button>
-      <button class="btn-confirm" id="modalConfirm">Télécharger .JSON</button>
-    </div>
+<!-- ═════════════ OVERLAYS ═════════════ -->
+<div class="drop-overlay" id="dropOverlay" aria-hidden="true">
+  <div class="drop-overlay-inner">
+    <span class="empty-icon"><i data-icon="upload"></i></span>
+    <h2>Déposez pour importer</h2>
+    <p>Fichier .svg uniquement</p>
   </div>
 </div>
 
-<!-- TOOLTIP -->
-<div id="globalTooltip" role="tooltip">
-  <div class="tt-title"></div>
-  <div class="tt-body"></div>
-</div>
+<dialog class="sheet" id="presetDialog" closedby="any" aria-labelledby="presetDialogTitle">
+  <form method="dialog">
+    <div>
+      <h3 id="presetDialogTitle">Exporter le preset</h3>
+      <p>Enregistre tous les paramètres actuels dans un fichier .json réutilisable.</p>
+    </div>
+    <div class="field">
+      <label class="field-label" for="presetName">Nom du preset</label>
+      <input class="control" type="text" id="presetName" placeholder="ex. Contreplaqué 3 mm" maxlength="80">
+    </div>
+    <div class="dialog-actions">
+      <button class="btn btn-secondary" value="cancel" formnovalidate>Annuler</button>
+      <button class="btn btn-primary" value="save">Exporter .json</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="sheet" id="shortcutsDialog" closedby="any" aria-labelledby="shortcutsTitle">
+  <form method="dialog">
+    <h3 id="shortcutsTitle">Raccourcis clavier</h3>
+    <div class="shortcuts">
+      <div><span>Importer un SVG</span><span><kbd>Ctrl</kbd> <kbd>O</kbd></span></div>
+      <div><span>Télécharger le PLT</span><span><kbd>Ctrl</kbd> <kbd>S</kbd></span></div>
+      <div><span>Ajuster la vue</span><kbd>F</kbd></div>
+      <div><span>Zoom avant / arrière</span><span><kbd>+</kbd> <kbd>−</kbd></span></div>
+      <div><span>Afficher les déplacements</span><kbd>T</kbd></div>
+      <div><span>Changer de vue</span><span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></span></div>
+      <div><span>Cette aide</span><kbd>?</kbd></div>
+    </div>
+    <div class="dialog-actions"><button class="btn btn-primary" value="close">Fermer</button></div>
+  </form>
+</dialog>
+
+<div id="tooltip" role="tooltip"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script>
+'use strict';
 /* ═══════════════════════════════════════════════
-   LASERPLOT — SVG → PLT (HPGL/2) Converter
+   LASERPLOT — SVG → PLT (HPGL) Converter
    ═══════════════════════════════════════════════ */
 
-// ── State ──
-let svgContent = null;
-let pltResult = null;
-let svgBaseName = 'gravure';
-let pltViewMode = 'canvas';
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
-// ── DOM refs ──
-const $ = id => document.getElementById(id);
-const fileInput = $('fileInput');
-const dropzone = $('dropzone');
-const fileInfo = $('fileInfo');
-const fileName = $('fileName');
-const btnConvert = $('btnConvert');
-const btnDownload = $('btnDownload');
-const placeholder = $('placeholder');
-const svgPreview = $('svgPreview');
-const pltPreview = $('pltPreview');
-const pltCode = $('pltCode');
-const statsBar = $('statsBar');
-const alertText = $('alertText');
-const alertHatch = $('alertHatch');
-const alertSuccess = $('alertSuccess');
-const alertError = $('alertError');
-const hatchPanel = $('hatchPanel');
-const hatchEnable = $('hatchEnable');
-const modalOverlay = $('modalOverlay');
-const presetName = $('presetName');
-const curveRes = $('curveRes');
-const curveResVal = $('curveResVal');
-const hatchSpacing = $('hatchSpacing');
-const hatchSpacingVal = $('hatchSpacingVal');
-const hatchAngle = $('hatchAngle');
-const hatchAngleVal = $('hatchAngleVal');
-const pageFormat = $('pageFormat');
-const tooltip = $('globalTooltip');
-const pltCanvas = $('pltCanvas');
-const pltViewToggle = $('pltViewToggle');
+const HPU = 40;                 // HPGL units per mm (1016 / inch)
+const PX_MM = 25.4 / 96;        // CSS px → mm
+const STORAGE_KEY = 'laserplot:settings:v2';
+const THEME_KEY = 'theme';
 
-// ── Dark Mode ──
-(function () {
-  const html = document.documentElement;
-  const btn = $('btnTheme');
-  const stored = localStorage.getItem('theme');
-  // Apply saved preference, otherwise rely on @media (prefers-color-scheme)
-  if (stored === 'dark' || stored === 'light') html.dataset.theme = stored;
+const PAGE_FORMATS = {
+  a5: [148, 210], a4: [210, 297], a3: [297, 420], a2: [420, 594],
+  a1: [594, 841], a0: [841, 1189], letter: [216, 279]
+};
 
-  btn.addEventListener('click', () => {
-    const isDark = html.dataset.theme === 'dark' ||
-      (!html.dataset.theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    const next = isDark ? 'light' : 'dark';
-    html.dataset.theme = next;
-    localStorage.setItem('theme', next);
-  });
-})();
+const DEFAULTS = {
+  pageFormat: 'a4', orientation: 'portrait', pageW: 210, pageH: 297, margin: 5,
+  scaleMode: 'fit', scalePct: 100, align: 'center', rotation: '0', mirror: false,
+  curveRes: 32, optimize: true, speedDraw: 20, speedTravel: 150,
+  hatchEnable: false, hatchType: 'lines', hatchSpacing: 0.5, hatchAngle: 45,
+  hatchContoursAlso: true, hatchBidirectional: true
+};
 
-// ══════════════════════════════════════════════════
-// 1. SVG PATH PARSER
-// ══════════════════════════════════════════════════
+const SAMPLE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="160mm" height="100mm" viewBox="0 0 160 100">
+  <rect x="4" y="4" width="152" height="92" rx="8" fill="none" stroke="#000"/>
+  <path d="M16 46a24 24 0 1 0 48 0a24 24 0 1 0 -48 0Z M28 46a12 12 0 1 0 24 0a12 12 0 1 0 -24 0Z" fill="#000" fill-rule="evenodd"/>
+  <polygon points="110,22 114.7,35.53 129.02,35.82 117.61,44.47 121.76,58.18 110,50 98.24,58.18 102.39,44.47 90.98,35.82 105.3,35.53" fill="#000"/>
+  <path d="M80 80 C 90 66, 100 94, 110 80 S 130 66, 140 80" fill="none" stroke="#000"/>
+  <g transform="translate(16 76)">
+    <rect width="48" height="10" rx="2" fill="none" stroke="#000"/>
+    <line x1="6" y1="5" x2="42" y2="5" stroke="#000"/>
+  </g>
+</svg>`;
+
+/* ── Icons (Lucide, stroke only) ── */
+const ICONS = {
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  replace: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  reset: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  chevron: '<path d="m6 9 6 6 6-6"/>',
+  save: '<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
+  folder: '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  minus: '<path d="M5 12h14"/>',
+  fit: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  error: '<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+  shapes: '<path d="M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="17.5" cy="17.5" r="3.5"/>',
+  route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+  keyboard: '<path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>'
+};
+function iconSvg(name, extraClass = '') {
+  return `<svg class="i ${extraClass}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+}
+function mountIcons(root = document) {
+  for (const el of $$('i[data-icon]', root)) {
+    el.outerHTML = iconSvg(el.dataset.icon, el.className);
+  }
+}
+
+/* ── Formatting ── */
+const nf = (d = 0) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtInt = n => nf(0).format(n);
+function fmtNum(n, max = 1) {
+  return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: max }).format(n);
+}
+function fmtLen(mm) {
+  if (mm >= 1000) return fmtNum(mm / 1000, 2) + ' m';
+  return fmtNum(mm, 0) + ' mm';
+}
+function fmtBytes(b) {
+  if (b < 1024) return b + ' o';
+  if (b < 1024 * 1024) return fmtNum(b / 1024, 1) + ' Ko';
+  return fmtNum(b / 1024 / 1024, 1) + ' Mo';
+}
+function fmtDuration(sec) {
+  if (!isFinite(sec)) return '—';
+  sec = Math.round(sec);
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  if (h) return `${h} h ${String(m).padStart(2, '0')} min`;
+  if (m) return `${m} min ${String(s).padStart(2, '0')} s`;
+  return `${s} s`;
+}
+const escapeHtml = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ═══════════════════════════════════════════════
+   1. SVG PATH PARSER
+   ═══════════════════════════════════════════════ */
 
 function parsePathData(d) {
-  const tokenRe = /([MmZzLlHhVvCcSsQqTtAa])|([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/g;
-  const tokens = [];
-  let m;
-  while ((m = tokenRe.exec(d)) !== null) {
-    tokens.push(m[1] ? { cmd: m[1] } : { num: parseFloat(m[2]) });
-  }
-
   const cmds = [];
-  let i = 0;
-  let cx = 0, cy = 0; // current point
-  let sx = 0, sy = 0; // start of subpath
-  let prevCmd = null;
+  const len = d.length;
+  const numRe = /[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/y;
+  let pos = 0;
 
-  function readNum() {
-    while (i < tokens.length && tokens[i].cmd !== undefined) i++;
-    if (i < tokens.length) return tokens[i++].num;
-    return 0;
-  }
+  const skip = () => { while (pos < len && /[\s,]/.test(d[pos])) pos++; };
+  const readNum = () => {
+    skip();
+    numRe.lastIndex = pos;
+    const m = numRe.exec(d);
+    if (!m) throw new SyntaxError('number');
+    pos = numRe.lastIndex;
+    return parseFloat(m[0]);
+  };
+  // Arc flags may be written without separators ("a1 1 0 011 1")
+  const readFlag = () => {
+    skip();
+    const c = d[pos];
+    if (c === '0' || c === '1') { pos++; return c === '1' ? 1 : 0; }
+    throw new SyntaxError('flag');
+  };
 
-  while (i < tokens.length) {
-    let cmd;
-    if (tokens[i].cmd !== undefined) {
-      cmd = tokens[i].cmd;
-      i++;
-    } else {
-      // Implicit command
-      if (prevCmd === 'M') cmd = 'L';
-      else if (prevCmd === 'm') cmd = 'l';
-      else cmd = prevCmd;
-    }
+  let cx = 0, cy = 0, sx = 0, sy = 0;
+  let prev = null;   // previous command letter
+  let lastType = null;
 
-    const isRel = cmd === cmd.toLowerCase() && cmd !== 'z' && cmd !== 'Z';
-    const type = cmd.toUpperCase();
-
-    if (type === 'Z') {
-      cmds.push({ type: 'Z', x: sx, y: sy });
-      cx = sx; cy = sy;
-      prevCmd = cmd;
-      continue;
-    }
-
-    const bx = isRel ? cx : 0;
-    const by = isRel ? cy : 0;
-
-    switch (type) {
-      case 'M': {
-        const x = readNum() + bx, y = readNum() + by;
-        cmds.push({ type: 'M', x, y });
-        cx = x; cy = y; sx = x; sy = y;
-        break;
+  try {
+    while (true) {
+      skip();
+      if (pos >= len) break;
+      let cmd;
+      if (/[MmZzLlHhVvCcSsQqTtAa]/.test(d[pos])) {
+        cmd = d[pos++];
+      } else {
+        if (!prev || prev === 'Z' || prev === 'z') break;
+        cmd = prev === 'M' ? 'L' : prev === 'm' ? 'l' : prev;
       }
-      case 'L': {
-        const x = readNum() + bx, y = readNum() + by;
-        cmds.push({ type: 'L', x, y });
-        cx = x; cy = y;
-        break;
-      }
-      case 'H': {
-        const x = readNum() + (isRel ? cx : 0);
-        cmds.push({ type: 'L', x, y: cy });
-        cx = x;
-        break;
-      }
-      case 'V': {
-        const y = readNum() + (isRel ? cy : 0);
-        cmds.push({ type: 'L', x: cx, y });
-        cy = y;
-        break;
-      }
-      case 'C': {
-        const x1 = readNum() + bx, y1 = readNum() + by;
-        const x2 = readNum() + bx, y2 = readNum() + by;
-        const x3 = readNum() + bx, y3 = readNum() + by;
-        cmds.push({ type: 'C', x1, y1, x2, y2, x: x3, y: y3 });
-        cx = x3; cy = y3;
-        break;
-      }
-      case 'S': {
-        let rx1, ry1;
-        if (prevCmd === 'C' || prevCmd === 'c' || prevCmd === 'S' || prevCmd === 's') {
-          const prev = cmds[cmds.length - 1];
-          rx1 = 2 * cx - prev.x2;
-          ry1 = 2 * cy - prev.y2;
-        } else {
-          rx1 = cx; ry1 = cy;
+      const rel = cmd >= 'a';
+      const type = cmd.toUpperCase();
+      const bx = rel ? cx : 0, by = rel ? cy : 0;
+
+      switch (type) {
+        case 'Z':
+          cmds.push({ type: 'Z', x: sx, y: sy });
+          cx = sx; cy = sy;
+          break;
+        case 'M': {
+          const x = readNum() + bx, y = readNum() + by;
+          cmds.push({ type: 'M', x, y });
+          cx = sx = x; cy = sy = y;
+          break;
         }
-        const x2 = readNum() + bx, y2 = readNum() + by;
-        const x3 = readNum() + bx, y3 = readNum() + by;
-        cmds.push({ type: 'C', x1: rx1, y1: ry1, x2, y2, x: x3, y: y3 });
-        cx = x3; cy = y3;
-        break;
-      }
-      case 'Q': {
-        const x1 = readNum() + bx, y1 = readNum() + by;
-        const x2 = readNum() + bx, y2 = readNum() + by;
-        cmds.push({ type: 'Q', x1, y1, x: x2, y: y2 });
-        cx = x2; cy = y2;
-        break;
-      }
-      case 'T': {
-        let rx1, ry1;
-        if (prevCmd === 'Q' || prevCmd === 'q' || prevCmd === 'T' || prevCmd === 't') {
-          const prev = cmds[cmds.length - 1];
-          rx1 = 2 * cx - prev.x1;
-          ry1 = 2 * cy - prev.y1;
-        } else {
-          rx1 = cx; ry1 = cy;
+        case 'L': {
+          const x = readNum() + bx, y = readNum() + by;
+          cmds.push({ type: 'L', x, y });
+          cx = x; cy = y;
+          break;
         }
-        const x2 = readNum() + bx, y2 = readNum() + by;
-        cmds.push({ type: 'Q', x1: rx1, y1: ry1, x: x2, y: y2 });
-        cx = x2; cy = y2;
-        break;
+        case 'H': {
+          const x = readNum() + bx;
+          cmds.push({ type: 'L', x, y: cy });
+          cx = x;
+          break;
+        }
+        case 'V': {
+          const y = readNum() + by;
+          cmds.push({ type: 'L', x: cx, y });
+          cy = y;
+          break;
+        }
+        case 'C': {
+          const x1 = readNum() + bx, y1 = readNum() + by;
+          const x2 = readNum() + bx, y2 = readNum() + by;
+          const x = readNum() + bx, y = readNum() + by;
+          cmds.push({ type: 'C', x1, y1, x2, y2, x, y });
+          cx = x; cy = y;
+          break;
+        }
+        case 'S': {
+          const p = cmds[cmds.length - 1];
+          const x1 = lastType === 'C' ? 2 * cx - p.x2 : cx;
+          const y1 = lastType === 'C' ? 2 * cy - p.y2 : cy;
+          const x2 = readNum() + bx, y2 = readNum() + by;
+          const x = readNum() + bx, y = readNum() + by;
+          cmds.push({ type: 'C', x1, y1, x2, y2, x, y });
+          cx = x; cy = y;
+          break;
+        }
+        case 'Q': {
+          const x1 = readNum() + bx, y1 = readNum() + by;
+          const x = readNum() + bx, y = readNum() + by;
+          cmds.push({ type: 'Q', x1, y1, x, y });
+          cx = x; cy = y;
+          break;
+        }
+        case 'T': {
+          const p = cmds[cmds.length - 1];
+          const x1 = lastType === 'Q' ? 2 * cx - p.x1 : cx;
+          const y1 = lastType === 'Q' ? 2 * cy - p.y1 : cy;
+          const x = readNum() + bx, y = readNum() + by;
+          cmds.push({ type: 'Q', x1, y1, x, y });
+          cx = x; cy = y;
+          break;
+        }
+        case 'A': {
+          const rx = readNum(), ry = readNum(), xRot = readNum();
+          const laf = readFlag(), sf = readFlag();
+          const x = readNum() + bx, y = readNum() + by;
+          cmds.push({ type: 'A', rx, ry, xRot, laf, sf, x, y });
+          cx = x; cy = y;
+          break;
+        }
       }
-      case 'A': {
-        const rx = readNum(), ry = readNum();
-        const xRot = readNum();
-        const laf = readNum();
-        const sf = readNum();
-        const x = readNum() + bx, y = readNum() + by;
-        cmds.push({ type: 'A', rx, ry, xRot, laf, sf, x, y });
-        cx = x; cy = y;
-        break;
-      }
+      prev = cmd;
+      lastType = cmds.length ? cmds[cmds.length - 1].type : null;
     }
-    prevCmd = cmd;
+  } catch (e) {
+    // Per SVG spec: render up to the first error
   }
   return cmds;
 }
 
-// ══════════════════════════════════════════════════
-// 2. CURVE TESSELLATION
-// ══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════
+   2. CURVE TESSELLATION
+   ═══════════════════════════════════════════════ */
 
 function cubicPts(sx, sy, x1, y1, x2, y2, x3, y3, n) {
   const pts = [];
   for (let i = 1; i <= n; i++) {
-    const t = i / n;
-    const u = 1 - t;
-    const x = u*u*u*sx + 3*u*u*t*x1 + 3*u*t*t*x2 + t*t*t*x3;
-    const y = u*u*u*sy + 3*u*u*t*y1 + 3*u*t*t*y2 + t*t*t*y3;
-    pts.push({ x, y });
+    const t = i / n, u = 1 - t;
+    pts.push({
+      x: u * u * u * sx + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
+      y: u * u * u * sy + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3
+    });
   }
   return pts;
 }
@@ -1452,1036 +1543,1536 @@ function cubicPts(sx, sy, x1, y1, x2, y2, x3, y3, n) {
 function quadPts(sx, sy, x1, y1, x2, y2, n) {
   const pts = [];
   for (let i = 1; i <= n; i++) {
-    const t = i / n;
-    const u = 1 - t;
-    const x = u*u*sx + 2*u*t*x1 + t*t*x2;
-    const y = u*u*sy + 2*u*t*y1 + t*t*y2;
-    pts.push({ x, y });
+    const t = i / n, u = 1 - t;
+    pts.push({ x: u * u * sx + 2 * u * t * x1 + t * t * x2, y: u * u * sy + 2 * u * t * y1 + t * t * y2 });
   }
   return pts;
 }
 
 function arcPts(sx, sy, rx, ry, xrDeg, laf, sf, ex, ey, n) {
-  if (rx === 0 || ry === 0) return [{ x: ex, y: ey }];
-
-  rx = Math.abs(rx);
-  ry = Math.abs(ry);
+  if (rx === 0 || ry === 0 || (sx === ex && sy === ey)) return [{ x: ex, y: ey }];
+  rx = Math.abs(rx); ry = Math.abs(ry);
   const xr = xrDeg * Math.PI / 180;
   const cosR = Math.cos(xr), sinR = Math.sin(xr);
 
-  // Step 1: Compute (x1', y1')
   const dx2 = (sx - ex) / 2, dy2 = (sy - ey) / 2;
   const x1p = cosR * dx2 + sinR * dy2;
   const y1p = -sinR * dx2 + cosR * dy2;
 
-  // Step 2: Correct radii
-  let lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
-  if (lambda > 1) {
-    const sl = Math.sqrt(lambda);
-    rx *= sl;
-    ry *= sl;
-  }
+  const lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
+  if (lambda > 1) { const s = Math.sqrt(lambda); rx *= s; ry *= s; }
 
-  // Step 3: Compute center
   const rxSq = rx * rx, rySq = ry * ry;
-  const x1pSq = x1p * x1p, y1pSq = y1p * y1p;
-  let num = rxSq * rySq - rxSq * y1pSq - rySq * x1pSq;
-  let den = rxSq * y1pSq + rySq * x1pSq;
+  let num = rxSq * rySq - rxSq * y1p * y1p - rySq * x1p * x1p;
+  const den = rxSq * y1p * y1p + rySq * x1p * x1p;
   if (num < 0) num = 0;
-  let sq = Math.sqrt(num / den);
+  let sq = den ? Math.sqrt(num / den) : 0;
   if (laf === sf) sq = -sq;
 
   const cxp = sq * rx * y1p / ry;
   const cyp = -sq * ry * x1p / rx;
+  const cx = cosR * cxp - sinR * cyp + (sx + ex) / 2;
+  const cy = sinR * cxp + cosR * cyp + (sy + ey) / 2;
 
-  const mx = (sx + ex) / 2, my = (sy + ey) / 2;
-  const cx = cosR * cxp - sinR * cyp + mx;
-  const cy = sinR * cxp + cosR * cyp + my;
-
-  // Step 4: Compute angles
-  function angle(ux, uy, vx, vy) {
+  const angle = (ux, uy, vx, vy) => {
     const dot = ux * vx + uy * vy;
-    const len = Math.sqrt(ux * ux + uy * uy) * Math.sqrt(vx * vx + vy * vy);
-    let a = Math.acos(Math.max(-1, Math.min(1, dot / len)));
+    const l = Math.hypot(ux, uy) * Math.hypot(vx, vy);
+    let a = Math.acos(Math.max(-1, Math.min(1, dot / l)));
     if (ux * vy - uy * vx < 0) a = -a;
     return a;
-  }
-
+  };
   const theta1 = angle(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry);
   let dtheta = angle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry);
+  if (!sf && dtheta > 0) dtheta -= 2 * Math.PI;
+  if (sf && dtheta < 0) dtheta += 2 * Math.PI;
 
-  if (sf === 0 && dtheta > 0) dtheta -= 2 * Math.PI;
-  if (sf === 1 && dtheta < 0) dtheta += 2 * Math.PI;
-
-  // Step 5: Generate points
+  // Segments proportional to the swept angle
+  const segs = Math.max(2, Math.ceil(n * Math.abs(dtheta) / (Math.PI / 2)));
   const pts = [];
-  for (let i = 1; i <= n; i++) {
-    const t = theta1 + dtheta * (i / n);
-    const px = rx * Math.cos(t);
-    const py = ry * Math.sin(t);
-    pts.push({
-      x: cosR * px - sinR * py + cx,
-      y: sinR * px + cosR * py + cy
-    });
+  for (let i = 1; i <= segs; i++) {
+    const t = theta1 + dtheta * (i / segs);
+    const px = rx * Math.cos(t), py = ry * Math.sin(t);
+    pts.push({ x: cosR * px - sinR * py + cx, y: sinR * px + cosR * py + cy });
   }
+  pts[pts.length - 1] = { x: ex, y: ey };
   return pts;
 }
 
-// ══════════════════════════════════════════════════
-// 3. TRANSFORM MATRICES
-// ══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════
+   3. TRANSFORMS & UNITS
+   ═══════════════════════════════════════════════ */
 
-// Matrix: [a, b, c, d, tx, ty]
-// x' = a*x + c*y + tx
-// y' = b*x + d*y + ty
+// Matrix [a, b, c, d, e, f] → x' = a·x + c·y + e ; y' = b·x + d·y + f
+const IDENTITY = [1, 0, 0, 1, 0, 0];
 
 function matMul(A, B) {
   return [
-    A[0]*B[0] + A[2]*B[1],
-    A[1]*B[0] + A[3]*B[1],
-    A[0]*B[2] + A[2]*B[3],
-    A[1]*B[2] + A[3]*B[3],
-    A[0]*B[4] + A[2]*B[5] + A[4],
-    A[1]*B[4] + A[3]*B[5] + A[5]
+    A[0] * B[0] + A[2] * B[1],
+    A[1] * B[0] + A[3] * B[1],
+    A[0] * B[2] + A[2] * B[3],
+    A[1] * B[2] + A[3] * B[3],
+    A[0] * B[4] + A[2] * B[5] + A[4],
+    A[1] * B[4] + A[3] * B[5] + A[5]
   ];
 }
 
-function localMat(el) {
-  const attr = el.getAttribute && el.getAttribute('transform');
-  if (!attr) return [1, 0, 0, 1, 0, 0];
-
-  let mat = [1, 0, 0, 1, 0, 0];
-  const re = /(matrix|translate|scale|rotate)\s*\(([^)]+)\)/g;
+function parseTransform(attr) {
+  let mat = IDENTITY;
+  if (!attr) return mat;
+  const re = /(matrix|translate|scale|rotate|skewX|skewY)\s*\(([^)]*)\)/g;
   let m;
   while ((m = re.exec(attr)) !== null) {
-    const args = m[2].split(/[\s,]+/).map(Number);
-    let t;
+    const a = (m[2].match(/[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g) || []).map(Number);
+    let t = IDENTITY;
     switch (m[1]) {
-      case 'matrix':
-        t = [args[0], args[1], args[2], args[3], args[4] || 0, args[5] || 0];
-        break;
-      case 'translate':
-        t = [1, 0, 0, 1, args[0], args[1] || 0];
-        break;
-      case 'scale': {
-        const sy = args[1] !== undefined ? args[1] : args[0];
-        t = [args[0], 0, 0, sy, 0, 0];
-        break;
-      }
+      case 'matrix': if (a.length >= 6) t = a.slice(0, 6); break;
+      case 'translate': t = [1, 0, 0, 1, a[0] || 0, a[1] || 0]; break;
+      case 'scale': t = [a[0] ?? 1, 0, 0, a[1] ?? a[0] ?? 1, 0, 0]; break;
       case 'rotate': {
-        const a = args[0] * Math.PI / 180;
-        const cos = Math.cos(a), sin = Math.sin(a);
-        if (args.length >= 3) {
-          const cx = args[1], cy = args[2];
-          t = matMul([1, 0, 0, 1, cx, cy], matMul([cos, sin, -sin, cos, 0, 0], [1, 0, 0, 1, -cx, -cy]));
-        } else {
-          t = [cos, sin, -sin, cos, 0, 0];
-        }
+        const r = (a[0] || 0) * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+        t = [c, s, -s, c, 0, 0];
+        if (a.length >= 3) t = matMul([1, 0, 0, 1, a[1], a[2]], matMul(t, [1, 0, 0, 1, -a[1], -a[2]]));
         break;
       }
-      default:
-        t = [1, 0, 0, 1, 0, 0];
+      case 'skewX': t = [1, 0, Math.tan((a[0] || 0) * Math.PI / 180), 1, 0, 0]; break;
+      case 'skewY': t = [1, Math.tan((a[0] || 0) * Math.PI / 180), 0, 1, 0, 0]; break;
     }
     mat = matMul(mat, t);
   }
   return mat;
 }
 
-function inheritedMat(el, root) {
-  const chain = [];
-  let cur = el;
-  while (cur && cur !== root) {
-    chain.push(cur);
-    cur = cur.parentNode;
-  }
-  let mat = [1, 0, 0, 1, 0, 0];
-  for (let i = chain.length - 1; i >= 0; i--) {
-    mat = matMul(mat, localMat(chain[i]));
-  }
-  return mat;
+function lengthToMM(str) {
+  if (!str) return null;
+  const m = /^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*(mm|cm|in|pt|pc|px|q)?\s*$/i.exec(str);
+  if (!m) return null; // percentages, em… → unknown
+  const v = parseFloat(m[1]);
+  const f = { mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6, px: PX_MM, q: 0.25 }[(m[2] || 'px').toLowerCase()];
+  return v > 0 ? v * f : null;
 }
 
-function applyMat(pts, m) {
-  return pts.map(p => ({
-    x: m[0] * p.x + m[2] * p.y + m[4],
-    y: m[1] * p.x + m[3] * p.y + m[5]
-  }));
+const localName = el => (el.localName || el.tagName || '').replace(/.*:/, '').toLowerCase();
+
+/* ═══════════════════════════════════════════════
+   4. SVG ANALYSIS & GEOMETRY EXTRACTION
+   ═══════════════════════════════════════════════ */
+
+function analyzeSvg(text) {
+  const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+  if (doc.getElementsByTagName('parsererror').length) {
+    throw new Error('Le fichier SVG est mal formé (XML invalide).');
+  }
+  const svg = doc.documentElement;
+  if (!svg || localName(svg) !== 'svg') throw new Error('Aucun élément <svg> racine trouvé dans le fichier.');
+
+  const vbParts = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+  const vb = vbParts.length === 4 && vbParts.every(isFinite) && vbParts[2] > 0 && vbParts[3] > 0
+    ? { x: vbParts[0], y: vbParts[1], w: vbParts[2], h: vbParts[3] } : null;
+  const wMM = lengthToMM(svg.getAttribute('width'));
+  const hMM = lengthToMM(svg.getAttribute('height'));
+
+  let unitMM = PX_MM;
+  if (vb) {
+    if (wMM) unitMM = wMM / vb.w;
+    else if (hMM) unitMM = hMM / vb.h;
+  }
+  const docW = wMM || (vb ? vb.w * unitMM : null);
+  const docH = hMM || (vb ? vb.h * unitMM : null);
+
+  const count = tag => svg.getElementsByTagNameNS('*', tag).length;
+  const idMap = new Map();
+  for (const el of svg.querySelectorAll('[id]')) idMap.set(el.getAttribute('id'), el);
+
+  return {
+    svg, idMap, unitMM, docW, docH,
+    textCount: count('text'),
+    imageCount: count('image'),
+    hasPhysicalSize: !!(wMM || hMM)
+  };
 }
 
-// ══════════════════════════════════════════════════
-// 4. ELEMENT TO POLYLINES
-// ══════════════════════════════════════════════════
+const SKIP_TAGS = new Set(['defs', 'style', 'script', 'mask', 'clippath', 'filter', 'symbol', 'metadata',
+  'title', 'desc', 'lineargradient', 'radialgradient', 'pattern', 'marker', 'foreignobject', 'text', 'image']);
+const SHAPE_TAGS = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 
-function elToPolylines(el, svgEl, n) {
-  const tag = (el.tagName || '').replace(/.*:/, '').toLowerCase();
-  const mat = inheritedMat(el, svgEl);
-  const result = { polylines: [], closed: false };
-
-  function attr(name, def) {
-    const v = el.getAttribute(name);
-    return v !== null ? parseFloat(v) : (def || 0);
-  }
-
-  switch (tag) {
-    case 'path': {
-      const d = el.getAttribute('d');
-      if (!d) break;
-      const cmds = parsePathData(d);
-      let poly = [];
-      let hasClosed = false;
-      let cx = 0, cy = 0;
-
-      for (const c of cmds) {
-        switch (c.type) {
-          case 'M':
-            if (poly.length > 0) result.polylines.push(poly);
-            poly = [{ x: c.x, y: c.y }];
-            cx = c.x; cy = c.y;
-            break;
-          case 'L':
-            poly.push({ x: c.x, y: c.y });
-            cx = c.x; cy = c.y;
-            break;
-          case 'C':
-            poly.push(...cubicPts(cx, cy, c.x1, c.y1, c.x2, c.y2, c.x, c.y, n));
-            cx = c.x; cy = c.y;
-            break;
-          case 'Q':
-            poly.push(...quadPts(cx, cy, c.x1, c.y1, c.x, c.y, n));
-            cx = c.x; cy = c.y;
-            break;
-          case 'A':
-            poly.push(...arcPts(cx, cy, c.rx, c.ry, c.xRot, c.laf, c.sf, c.x, c.y, n));
-            cx = c.x; cy = c.y;
-            break;
-          case 'Z':
-            poly.push({ x: c.x, y: c.y });
-            hasClosed = true;
-            cx = c.x; cy = c.y;
-            break;
-        }
-      }
-      if (poly.length > 0) result.polylines.push(poly);
-      result.closed = hasClosed;
-      break;
-    }
-
-    case 'rect': {
-      const x = attr('x'), y = attr('y');
-      const w = attr('width'), h = attr('height');
-      let rx = attr('rx', 0), ry = attr('ry', 0);
-      if (rx === 0 && ry !== 0) rx = ry;
-      if (ry === 0 && rx !== 0) ry = rx;
-      rx = Math.min(rx, w / 2);
-      ry = Math.min(ry, h / 2);
-
-      if (rx === 0 && ry === 0) {
-        result.polylines.push([
-          { x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }, { x, y }
-        ]);
-      } else {
-        const segs = Math.max(2, Math.floor(n / 4));
-        const poly = [];
-        // Top-right corner
-        poly.push(...arcPts(x + w - rx, y, rx, ry, 0, 0, 1, x + w, y + ry, segs));
-        // Bottom-right corner
-        poly.push(...arcPts(x + w, y + h - ry, rx, ry, 0, 0, 1, x + w - rx, y + h, segs));
-        // Bottom-left corner
-        poly.push(...arcPts(x + rx, y + h, rx, ry, 0, 0, 1, x, y + h - ry, segs));
-        // Top-left corner
-        poly.push(...arcPts(x, y + ry, rx, ry, 0, 0, 1, x + rx, y, segs));
-        poly.push(poly[0]); // close
-        result.polylines.push(poly);
-      }
-      result.closed = true;
-      break;
-    }
-
-    case 'circle': {
-      const cx = attr('cx'), cy = attr('cy'), r = attr('r');
-      const poly = [];
-      for (let i = 0; i <= n; i++) {
-        const a = (2 * Math.PI * i) / n;
-        poly.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
-      }
-      result.polylines.push(poly);
-      result.closed = true;
-      break;
-    }
-
-    case 'ellipse': {
-      const cx = attr('cx'), cy = attr('cy');
-      const rx = attr('rx'), ry = attr('ry');
-      const poly = [];
-      for (let i = 0; i <= n; i++) {
-        const a = (2 * Math.PI * i) / n;
-        poly.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
-      }
-      result.polylines.push(poly);
-      result.closed = true;
-      break;
-    }
-
-    case 'line': {
-      const x1 = attr('x1'), y1 = attr('y1');
-      const x2 = attr('x2'), y2 = attr('y2');
-      result.polylines.push([{ x: x1, y: y1 }, { x: x2, y: y2 }]);
-      result.closed = false;
-      break;
-    }
-
-    case 'polyline': {
-      const pts = parsePoints(el.getAttribute('points') || '');
-      if (pts.length) result.polylines.push(pts);
-      result.closed = false;
-      break;
-    }
-
-    case 'polygon': {
-      const pts = parsePoints(el.getAttribute('points') || '');
-      if (pts.length) {
-        pts.push({ x: pts[0].x, y: pts[0].y });
-        result.polylines.push(pts);
-      }
-      result.closed = true;
-      break;
-    }
-  }
-
-  // Apply transform to all polylines
-  result.polylines = result.polylines.map(pl => applyMat(pl, mat));
-  return result;
+function isHidden(el) {
+  if (el.getAttribute('display') === 'none') return true;
+  const vis = el.getAttribute('visibility');
+  if (vis === 'hidden' || vis === 'collapse') return true;
+  const style = el.getAttribute('style');
+  return !!style && /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)/i.test(style);
 }
 
 function parsePoints(s) {
   const nums = s.match(/[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g);
   if (!nums) return [];
   const pts = [];
-  for (let i = 0; i + 1 < nums.length; i += 2) {
-    pts.push({ x: parseFloat(nums[i]), y: parseFloat(nums[i + 1]) });
-  }
+  for (let i = 0; i + 1 < nums.length; i += 2) pts.push({ x: +nums[i], y: +nums[i + 1] });
   return pts;
 }
 
-// ══════════════════════════════════════════════════
-// 5. HATCHING (SCANLINE FILL)
-// ══════════════════════════════════════════════════
+function shapeToPolylines(el, tag, n) {
+  const num = (name, def = 0) => {
+    const v = parseFloat(el.getAttribute(name));
+    return isFinite(v) ? v : def;
+  };
+  const polys = [];
+  let closed = false;
 
-function segIsect(ax, ay, bx, by, cx, cy, dx, dy) {
-  const denom = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
-  if (Math.abs(denom) < 1e-12) return null;
-  const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / denom;
-  const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / denom;
-  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-    return ax + t * (bx - ax);
+  switch (tag) {
+    case 'path': {
+      const cmds = parsePathData(el.getAttribute('d') || '');
+      let poly = [], cx = 0, cy = 0;
+      for (const c of cmds) {
+        switch (c.type) {
+          case 'M':
+            if (poly.length > 1) polys.push(poly);
+            poly = [{ x: c.x, y: c.y }];
+            break;
+          case 'L': poly.push({ x: c.x, y: c.y }); break;
+          case 'C': poly.push(...cubicPts(cx, cy, c.x1, c.y1, c.x2, c.y2, c.x, c.y, n)); break;
+          case 'Q': poly.push(...quadPts(cx, cy, c.x1, c.y1, c.x, c.y, n)); break;
+          case 'A': poly.push(...arcPts(cx, cy, c.rx, c.ry, c.xRot, c.laf, c.sf, c.x, c.y, Math.max(2, n / 2))); break;
+          case 'Z':
+            poly.push({ x: c.x, y: c.y });
+            closed = true;
+            if (poly.length > 1) polys.push(poly);
+            poly = [{ x: c.x, y: c.y }];
+            break;
+        }
+        cx = c.x; cy = c.y;
+      }
+      if (poly.length > 1) polys.push(poly);
+      break;
+    }
+    case 'rect': {
+      const x = num('x'), y = num('y'), w = num('width'), h = num('height');
+      if (w <= 0 || h <= 0) break;
+      let rx = el.hasAttribute('rx') ? num('rx') : null;
+      let ry = el.hasAttribute('ry') ? num('ry') : null;
+      if (rx === null) rx = ry ?? 0;
+      if (ry === null) ry = rx;
+      rx = Math.min(Math.max(rx, 0), w / 2);
+      ry = Math.min(Math.max(ry, 0), h / 2);
+      if (!rx || !ry) {
+        polys.push([{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }, { x, y }]);
+      } else {
+        const k = Math.max(2, n / 2);
+        const p = [{ x: x + rx, y }];
+        p.push({ x: x + w - rx, y });
+        p.push(...arcPts(x + w - rx, y, rx, ry, 0, 0, 1, x + w, y + ry, k));
+        p.push({ x: x + w, y: y + h - ry });
+        p.push(...arcPts(x + w, y + h - ry, rx, ry, 0, 0, 1, x + w - rx, y + h, k));
+        p.push({ x: x + rx, y: y + h });
+        p.push(...arcPts(x + rx, y + h, rx, ry, 0, 0, 1, x, y + h - ry, k));
+        p.push({ x, y: y + ry });
+        p.push(...arcPts(x, y + ry, rx, ry, 0, 0, 1, x + rx, y, k));
+        polys.push(p);
+      }
+      closed = true;
+      break;
+    }
+    case 'circle':
+    case 'ellipse': {
+      const cx = num('cx'), cy = num('cy');
+      const rx = tag === 'circle' ? num('r') : num('rx');
+      const ry = tag === 'circle' ? rx : num('ry');
+      if (rx <= 0 || ry <= 0) break;
+      const segs = Math.max(16, n * 2);
+      const p = [];
+      for (let i = 0; i <= segs; i++) {
+        const a = (2 * Math.PI * i) / segs;
+        p.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
+      }
+      polys.push(p);
+      closed = true;
+      break;
+    }
+    case 'line':
+      polys.push([{ x: num('x1'), y: num('y1') }, { x: num('x2'), y: num('y2') }]);
+      break;
+    case 'polyline':
+    case 'polygon': {
+      const pts = parsePoints(el.getAttribute('points') || '');
+      if (pts.length < 2) break;
+      if (tag === 'polygon') { pts.push({ ...pts[0] }); closed = true; }
+      polys.push(pts);
+      break;
+    }
   }
-  return null;
+  return { polys, closed };
 }
 
-function generateHatch(polygons, spacing, angleDeg, bidir) {
-  const lines = [];
-  if (!polygons.length || spacing <= 0) return lines;
+function extractGeometry(info, n) {
+  const shapes = [];
+  const useStack = new Set();
 
-  const rad = -angleDeg * Math.PI / 180;
-  const cosA = Math.cos(rad), sinA = Math.sin(rad);
+  function walk(el, parentMat, depth) {
+    if (depth > 64 || isHidden(el)) return;
+    const tag = localName(el);
+    const mat = matMul(parentMat, parseTransform(el.getAttribute('transform')));
 
-  // Rotate polygons
-  const rotPolys = polygons.map(poly =>
-    poly.map(p => ({ x: cosA * p.x - sinA * p.y, y: sinA * p.x + cosA * p.y }))
-  );
-
-  // Bounding box in rotated space
-  let minY = Infinity, maxY = -Infinity;
-  for (const poly of rotPolys) {
-    for (const p of poly) {
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
+    if (tag === 'use') {
+      const href = el.getAttribute('href') || el.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || '';
+      const target = href.startsWith('#') ? info.idMap.get(href.slice(1)) : null;
+      if (!target || useStack.has(target)) return;
+      const ux = parseFloat(el.getAttribute('x')) || 0, uy = parseFloat(el.getAttribute('y')) || 0;
+      const m2 = matMul(mat, [1, 0, 0, 1, ux, uy]);
+      useStack.add(target);
+      if (localName(target) === 'symbol') {
+        for (const c of target.children) walk(c, m2, depth + 1);
+      } else {
+        walk(target, m2, depth + 1);
+      }
+      useStack.delete(target);
+      return;
     }
+    if (SKIP_TAGS.has(tag)) return;
+    if (tag === 'svg' && depth > 0) {
+      // Nested <svg>: honour its x/y offset
+      const sx = parseFloat(el.getAttribute('x')) || 0, sy = parseFloat(el.getAttribute('y')) || 0;
+      for (const c of el.children) walk(c, matMul(mat, [1, 0, 0, 1, sx, sy]), depth + 1);
+      return;
+    }
+    if (SHAPE_TAGS.has(tag)) {
+      const g = shapeToPolylines(el, tag, n);
+      const polys = g.polys
+        .map(pl => pl.map(p => ({ x: mat[0] * p.x + mat[2] * p.y + mat[4], y: mat[1] * p.x + mat[3] * p.y + mat[5] })))
+        .map(pl => pl.filter(p => isFinite(p.x) && isFinite(p.y)))
+        .filter(pl => pl.length > 1);
+      if (polys.length) shapes.push({ polys, closed: g.closed });
+      return;
+    }
+    for (const c of el.children) walk(c, mat, depth + 1);
   }
 
-  // Inverse rotation
-  const cosB = Math.cos(-rad), sinB = Math.sin(-rad);
+  walk(info.svg, IDENTITY, 0);
+  return shapes;
+}
 
-  let li = 0;
-  for (let y = minY + spacing / 2; y < maxY; y += spacing, li++) {
-    // Find intersections with all polygon edges
-    const xs = [];
-    for (const poly of rotPolys) {
-      for (let i = 0; i < poly.length - 1; i++) {
-        const ix = segIsect(
-          poly[i].x, poly[i].y, poly[i + 1].x, poly[i + 1].y,
-          -1e9, y, 1e9, y
-        );
-        if (ix !== null) xs.push(ix);
-      }
+/* ═══════════════════════════════════════════════
+   5. LAYOUT (user units → page mm, Y up)
+   ═══════════════════════════════════════════════ */
+
+function layoutShapes(shapes, info, s) {
+  const rot = parseInt(s.rotation, 10) || 0;
+  const orient = (p) => {
+    let x = s.mirror ? -p.x : p.x, y = p.y;
+    switch (rot) { // clockwise, in SVG (Y-down) space
+      case 90: return { x: -y, y: x };
+      case 180: return { x: -x, y: -y };
+      case 270: return { x: y, y: -x };
+      default: return { x, y };
     }
+  };
+  const oriented = shapes.map(sh => ({ closed: sh.closed, polys: sh.polys.map(pl => pl.map(orient)) }));
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const sh of oriented) for (const pl of sh.polys) for (const p of pl) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  const bbW = maxX - minX, bbH = maxY - minY;
+  const usableW = s.pageW - 2 * s.margin, usableH = s.pageH - 2 * s.margin;
+
+  let scale;
+  if (s.scaleMode === 'fit') {
+    const sx = bbW > 1e-9 ? usableW / bbW : Infinity;
+    const sy = bbH > 1e-9 ? usableH / bbH : Infinity;
+    scale = Math.min(sx, sy);
+    if (!isFinite(scale)) scale = info.unitMM;
+  } else if (s.scaleMode === 'custom') {
+    scale = info.unitMM * s.scalePct / 100;
+  } else {
+    scale = info.unitMM;
+  }
+
+  const w = bbW * scale, h = bbH * scale;
+  let ox, oy;
+  if (s.align === 'center') {
+    ox = s.margin + (usableW - w) / 2;
+    oy = s.margin + (usableH - h) / 2;
+  } else if (s.align === 'top-left') {
+    ox = s.margin;
+    oy = s.pageH - s.margin - h;
+  } else {
+    ox = s.margin;
+    oy = s.margin;
+  }
+
+  const out = oriented.map(sh => ({
+    closed: sh.closed,
+    polys: sh.polys.map(pl => pl.map(p => ({ x: ox + (p.x - minX) * scale, y: oy + (maxY - p.y) * scale })))
+  }));
+  const eps = 0.01;
+  return {
+    shapes: out,
+    bounds: { x: ox, y: oy, w, h },
+    scale,
+    overflow: ox < -eps || oy < -eps || ox + w > s.pageW + eps || oy + h > s.pageH + eps,
+    outsideMargin: w > usableW + eps || h > usableH + eps
+  };
+}
+
+/* ═══════════════════════════════════════════════
+   6. HATCHING (scanline fill, even-odd)
+   ═══════════════════════════════════════════════ */
+
+function generateHatch(polys, spacing, angleDeg, bidir) {
+  const lines = [];
+  if (!polys.length || !(spacing > 0)) return lines;
+
+  const rad = -angleDeg * Math.PI / 180;
+  const c = Math.cos(rad), s = Math.sin(rad);
+
+  // Rotate into scanline space and build the edge table
+  const edges = [];
+  let minY = Infinity, maxY = -Infinity;
+  for (const pl of polys) {
+    const r = pl.map(p => ({ x: c * p.x - s * p.y, y: s * p.x + c * p.y }));
+    const nPts = r.length;
+    for (let i = 0; i < nPts; i++) {
+      const a = r[i], b = r[(i + 1) % nPts]; // implicit closing edge
+      if (a.y === b.y) continue;
+      const [lo, hi] = a.y < b.y ? [a, b] : [b, a];
+      edges.push({ y0: lo.y, y1: hi.y, x0: lo.x, k: (hi.x - lo.x) / (hi.y - lo.y) });
+      if (lo.y < minY) minY = lo.y;
+      if (hi.y > maxY) maxY = hi.y;
+    }
+  }
+  if (!edges.length) return lines;
+  edges.sort((a, b) => a.y0 - b.y0);
+
+  const ic = Math.cos(-rad), is = Math.sin(-rad);
+  const back = (x, y) => ({ x: ic * x - is * y, y: is * x + ic * y });
+
+  // Guard against runaway line counts
+  const count = (maxY - minY) / spacing;
+  if (count > 200000) spacing = (maxY - minY) / 200000;
+
+  let active = [], ei = 0, li = 0;
+  for (let y = minY + spacing / 2; y < maxY; y += spacing) {
+    while (ei < edges.length && edges[ei].y0 <= y) active.push(edges[ei++]);
+    active = active.filter(e => e.y1 > y);
+    const xs = [];
+    for (const e of active) if (e.y0 <= y) xs.push(e.x0 + (y - e.y0) * e.k);
+    if (xs.length < 2) continue;
     xs.sort((a, b) => a - b);
 
-    // Pair up intersections
+    const segs = [];
     for (let j = 0; j + 1 < xs.length; j += 2) {
-      let x0 = xs[j], x1 = xs[j + 1];
-      if (bidir && li % 2 === 1) { const tmp = x0; x0 = x1; x1 = tmp; }
-      // Rotate back
-      lines.push([
-        { x: cosB * x0 - sinB * y, y: sinB * x0 + cosB * y },
-        { x: cosB * x1 - sinB * y, y: sinB * x1 + cosB * y }
-      ]);
+      if (xs[j + 1] - xs[j] > 1e-9) segs.push([xs[j], xs[j + 1]]);
     }
+    if (!segs.length) continue;
+    const reverse = bidir && li % 2 === 1;
+    if (reverse) segs.reverse();
+    for (const [a, b] of segs) {
+      lines.push(reverse ? [back(b, y), back(a, y)] : [back(a, y), back(b, y)]);
+    }
+    li++;
   }
   return lines;
 }
 
-// ══════════════════════════════════════════════════
-// 6. SVG → PLT CONVERSION
-// ══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════
+   7. TRAVEL OPTIMISATION (nearest neighbour, grid index)
+   ═══════════════════════════════════════════════ */
 
-function convertSVGtoPLT(svgText, opts) {
-  const HPU = 40; // HPGL units per mm
+function orderStrokes(strokes) {
+  const n = strokes.length;
+  if (n < 3) return strokes;
 
-  // Parse SVG
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(svgText, 'image/svg+xml');
-  const svgEl = doc.querySelector('svg');
-  if (!svgEl) throw new Error('Élément <svg> introuvable dans le fichier.');
-
-  // Detect text
-  const hasText = svgEl.querySelectorAll('text').length > 0;
-
-  // Get SVG dimensions
-  let vbW, vbH;
-  const vb = svgEl.getAttribute('viewBox');
-  if (vb) {
-    const parts = vb.split(/[\s,]+/).map(Number);
-    vbW = parts[2];
-    vbH = parts[3];
-  } else {
-    vbW = parseFloat(svgEl.getAttribute('width')) || 210;
-    vbH = parseFloat(svgEl.getAttribute('height')) || 297;
-  }
-
-  // Excluded containers
-  const excluded = new Set(['defs', 'style', 'script', 'mask', 'clippath', 'filter', 'symbol', 'metadata']);
-
-  function isExcluded(el) {
-    let cur = el.parentNode;
-    while (cur && cur !== svgEl) {
-      const t = (cur.tagName || '').replace(/.*:/, '').toLowerCase();
-      if (excluded.has(t)) return true;
-      cur = cur.parentNode;
-    }
-    return false;
-  }
-
-  // Collect graphical elements
-  const supported = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
-  const elements = [];
-  const allDescs = svgEl.querySelectorAll('*');
-  for (const el of allDescs) {
-    const tag = (el.tagName || '').replace(/.*:/, '').toLowerCase();
-    if (supported.has(tag) && !isExcluded(el)) {
-      const data = elToPolylines(el, svgEl, opts.curveRes);
-      if (data.polylines.length) elements.push(data);
-    }
-  }
-
-  // Global bounding box
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const elem of elements) {
-    for (const pl of elem.polylines) {
-      for (const p of pl) {
-        if (p.x < minX) minX = p.x;
-        if (p.y < minY) minY = p.y;
-        if (p.x > maxX) maxX = p.x;
-        if (p.y > maxY) maxY = p.y;
-      }
-    }
+  for (const st of strokes) for (const p of [st.pts[0], st.pts[st.pts.length - 1]]) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
   }
-
-  if (!isFinite(minX)) {
-    return { pltStr: 'SP1;\n', hasText, cmdCount: 0, distMM: 0, elemCount: 0, hatchLineCount: 0 };
-  }
-
-  const bbW = maxX - minX || 1;
-  const bbH = maxY - minY || 1;
-
-  // Scale calculation
-  const pageWmm = opts.pageW;
-  const pageHmm = opts.pageH;
-  const marginMM = opts.margin;
-  const usableW = (pageWmm - 2 * marginMM);
-  const usableH = (pageHmm - 2 * marginMM);
-
-  let scale;
-  if (opts.fitPage) {
-    const fitScale = Math.min(usableW / bbW, usableH / bbH);
-    scale = fitScale * HPU;
-  } else {
-    scale = HPU;
-  }
-
-  const marginH = marginMM * HPU;
-
-  // Coordinate transform
-  function toH(pt) {
-    const x = (pt.x - minX) * scale + marginH;
-    const y = (maxY - pt.y) * scale + marginH; // invert Y
-    return { x: Math.round(x), y: Math.round(y) };
-  }
-
-  // Generate HPGL
-  let hpgl = 'SP1;\n';
-  let cmdCount = 0;
-  let totalDist = 0;
-  let hatchLineCount = 0;
-  let lastX = 0, lastY = 0;
-
-  function moveTo(p) {
-    hpgl += `PU${p.x},${p.y};\n`;
-    cmdCount++;
-    lastX = p.x; lastY = p.y;
-  }
-
-  function drawTo(p) {
-    const dx = p.x - lastX, dy = p.y - lastY;
-    totalDist += Math.sqrt(dx * dx + dy * dy);
-    hpgl += `PD${p.x},${p.y};\n`;
-    cmdCount++;
-    lastX = p.x; lastY = p.y;
-  }
-
-  for (const elem of elements) {
-    // Draw contours
-    if (!opts.hatchEnable || opts.hatchContoursAlso) {
-      for (const pl of elem.polylines) {
-        if (pl.length < 2) continue;
-        moveTo(toH(pl[0]));
-        for (let i = 1; i < pl.length; i++) {
-          drawTo(toH(pl[i]));
-        }
-      }
-    }
-
-    // Hatch closed shapes
-    if (opts.hatchEnable && elem.closed) {
-      const spacingSvg = opts.hatchSpacing / (scale / HPU);
-
-      const angles = [opts.hatchAngle];
-      if (opts.hatchType === 'cross') {
-        angles.push((opts.hatchAngle + 90) % 180);
-      }
-
-      for (const angle of angles) {
-        const hatchLines = generateHatch(elem.polylines, spacingSvg, angle, opts.hatchBidirectional);
-        hatchLineCount += hatchLines.length;
-        for (const line of hatchLines) {
-          moveTo(toH(line[0]));
-          drawTo(toH(line[1]));
-        }
-      }
-    }
-  }
-
-  // Distance in mm
-  const distMM = totalDist / HPU;
-
-  return {
-    pltStr: hpgl,
-    hasText,
-    cmdCount,
-    distMM: Math.round(distMM * 10) / 10,
-    elemCount: elements.length,
-    hatchLineCount
+  const dim = Math.max(1, Math.ceil(Math.sqrt(n)));
+  const cell = Math.max((maxX - minX) / dim, (maxY - minY) / dim, 1e-6);
+  const gx = Math.floor((maxX - minX) / cell) + 1;
+  const gy = Math.floor((maxY - minY) / cell) + 1;
+  const grid = new Map();
+  const key = (i, j) => i * 100003 + j;
+  const add = (p, idx, end) => {
+    const i = Math.floor((p.x - minX) / cell), j = Math.floor((p.y - minY) / cell);
+    const k = key(i, j);
+    let b = grid.get(k);
+    if (!b) grid.set(k, b = []);
+    b.push(idx, end);
   };
+  strokes.forEach((st, idx) => {
+    add(st.pts[0], idx, 0);
+    if (!st.closed) add(st.pts[st.pts.length - 1], idx, 1);
+  });
+
+  const used = new Uint8Array(n);
+  const out = [];
+  let cx = 0, cy = 0;
+
+  for (let k = 0; k < n; k++) {
+    const ci = Math.floor((cx - minX) / cell), cj = Math.floor((cy - minY) / cell);
+    let best = -1, bestEnd = 0, bestD = Infinity;
+    const maxR = Math.max(gx, gy) + Math.abs(ci) + Math.abs(cj) + 1;
+    for (let r = 0; r <= maxR; r++) {
+      for (let i = ci - r; i <= ci + r; i++) {
+        const onEdgeI = i === ci - r || i === ci + r;
+        if (i < 0 || i >= gx) continue;
+        for (let j = cj - r; j <= cj + r; j += onEdgeI ? 1 : 2 * r || 1) {
+          if (j < 0 || j >= gy) continue;
+          const b = grid.get(key(i, j));
+          if (!b) continue;
+          for (let q = 0; q < b.length; q += 2) {
+            const idx = b[q];
+            if (used[idx]) continue;
+            const pts = strokes[idx].pts;
+            const p = b[q + 1] ? pts[pts.length - 1] : pts[0];
+            const d = (p.x - cx) ** 2 + (p.y - cy) ** 2;
+            if (d < bestD) { bestD = d; best = idx; bestEnd = b[q + 1]; }
+          }
+        }
+      }
+      if (best >= 0 && Math.sqrt(bestD) <= r * cell) break;
+    }
+    if (best < 0) break;
+    used[best] = 1;
+    const st = strokes[best];
+    const pts = bestEnd ? st.pts.slice().reverse() : st.pts;
+    out.push({ ...st, pts });
+    const last = pts[pts.length - 1];
+    cx = last.x; cy = last.y;
+  }
+  return out;
 }
 
-// ══════════════════════════════════════════════════
-// 7. HATCH PREVIEW
-// ══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════
+   8. CONVERSION PIPELINE
+   ═══════════════════════════════════════════════ */
 
-function updateHatchPreview() {
-  const svg = $('hatchPreviewSvg');
-  // Remove existing lines
-  while (svg.childNodes.length > 1) svg.removeChild(svg.lastChild);
-  // Keep the rect
-  const rect = svg.querySelector('rect');
-
-  const spacing = parseFloat(hatchSpacing.value) * 9; // scale to preview
-  const angle = parseFloat(hatchAngle.value);
-  const type = $('hatchType').value;
-
-  const polygon = [
-    { x: 20, y: 8 }, { x: 180, y: 8 }, { x: 180, y: 68 }, { x: 20, y: 68 }, { x: 20, y: 8 }
-  ];
-
-  const angles = [angle];
-  if (type === 'cross') angles.push((angle + 90) % 180);
-
-  for (const a of angles) {
-    const lines = generateHatch([polygon], spacing, a, false);
-    for (const line of lines) {
-      const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      l.setAttribute('x1', line[0].x);
-      l.setAttribute('y1', line[0].y);
-      l.setAttribute('x2', line[1].x);
-      l.setAttribute('y2', line[1].y);
-      l.setAttribute('stroke', 'var(--text)');
-      l.setAttribute('stroke-width', '0.8');
-      l.setAttribute('opacity', '0.6');
-      svg.appendChild(l);
+function buildStrokes(layout, s) {
+  const strokes = [];
+  let hatchCount = 0;
+  for (const sh of layout.shapes) {
+    if (!s.hatchEnable || s.hatchContoursAlso || !sh.closed) {
+      for (const pl of sh.polys) {
+        const a = pl[0], b = pl[pl.length - 1];
+        const closed = Math.hypot(a.x - b.x, a.y - b.y) < 1e-6;
+        strokes.push({ pts: pl, closed, kind: 'contour' });
+      }
+    }
+    if (s.hatchEnable && sh.closed) {
+      const angles = [s.hatchAngle];
+      if (s.hatchType === 'cross') angles.push((s.hatchAngle + 90) % 180);
+      for (const ang of angles) {
+        const lines = generateHatch(sh.polys, s.hatchSpacing, ang, s.hatchBidirectional);
+        hatchCount += lines.length;
+        for (const l of lines) strokes.push({ pts: l, closed: false, kind: 'hatch' });
+      }
     }
   }
+  return { strokes, hatchCount };
 }
 
-// ══════════════════════════════════════════════════
-// 8. PRESETS
-// ══════════════════════════════════════════════════
+function emitHPGL(strokes) {
+  const out = ['IN;', 'SP1;'];
+  const plot = [];            // [{ pts: Float64Array (mm), from: {x,y}|null }]
+  let lx = null, ly = null;   // last position (HPGL units)
+  let draw = 0, travel = 0;
 
-const presetFields = {
-  numbers: ['pageW', 'pageH', 'margin'],
-  ranges: ['curveRes', 'hatchSpacing', 'hatchAngle'],
-  checks: ['fitPage', 'hatchEnable', 'hatchContoursAlso', 'hatchBidirectional'],
-  selects: ['pageFormat', 'hatchType']
+  for (const st of strokes) {
+    const q = st.pts.map(p => [Math.round(p.x * HPU), Math.round(p.y * HPU)]);
+    // Drop consecutive duplicates
+    const pts = [q[0]];
+    for (let i = 1; i < q.length; i++) {
+      const p = pts[pts.length - 1];
+      if (q[i][0] !== p[0] || q[i][1] !== p[1]) pts.push(q[i]);
+    }
+    if (pts.length < 2) continue;
+
+    const [x0, y0] = pts[0];
+    if (x0 !== lx || y0 !== ly) {
+      if (lx !== null) travel += Math.hypot(x0 - lx, y0 - ly);
+      out.push(`PU${x0},${y0};`);
+    }
+    const flat = new Float64Array(pts.length * 2);
+    flat[0] = x0 / HPU; flat[1] = y0 / HPU;
+    let px = x0, py = y0;
+    for (let i = 1; i < pts.length; i++) {
+      const [x, y] = pts[i];
+      out.push(`PD${x},${y};`);
+      draw += Math.hypot(x - px, y - py);
+      px = x; py = y;
+      flat[i * 2] = x / HPU; flat[i * 2 + 1] = y / HPU;
+    }
+    plot.push({ pts: flat, kind: st.kind });
+    lx = px; ly = py;
+  }
+  out.push('PU;');
+  const text = out.join('\n') + '\n';
+  return { text, plot, cmdCount: out.length, drawMM: draw / HPU, travelMM: travel / HPU };
+}
+
+/* ═══════════════════════════════════════════════
+   9. APP STATE
+   ═══════════════════════════════════════════════ */
+
+const state = {
+  file: null,          // { name, size, text, url }
+  info: null,          // analyzeSvg() result
+  geomCache: new Map(),
+  result: null,
+  lastDuration: 0,
+  tab: 'preview',
+  showTravel: true,
+  sim: { on: false, progress: 1, playing: false, raf: 0 },
+  view: { zoom: 1, x: 0, y: 0, fitted: true, fitZoom: 1 },
+  colors: null
 };
 
-function gatherSettings() {
+const els = {
+  form: $('#settings'),
+  fileInput: $('#fileInput'),
+  presetInput: $('#presetInput'),
+  fileEmpty: $('#fileEmpty'),
+  fileCard: $('#fileCard'),
+  fileThumb: $('#fileThumb'),
+  fileName: $('#fileName'),
+  fileMeta: $('#fileMeta'),
+  topbarFile: $('#topbarFile'),
+  btnDownload: $('#btnDownload'),
+  footerName: $('#footerName'),
+  footerSize: $('#footerSize'),
+  issues: $('#issues'),
+  wsBody: $('#wsBody'),
+  empty: $('#empty'),
+  viewport: $('#viewport'),
+  canvas: $('#canvas'),
+  hudCoords: $('#hudCoords'),
+  zoomVal: $('#zoomVal'),
+  code: $('#code'),
+  codeNote: $('#codeNote'),
+  sourceImg: $('#sourceImg'),
+  sim: $('#sim'),
+  simRange: $('#simRange'),
+  simOut: $('#simOut'),
+  tooltip: $('#tooltip'),
+  toasts: $('#toasts'),
+  dropOverlay: $('#dropOverlay'),
+  presetDialog: $('#presetDialog'),
+  shortcutsDialog: $('#shortcutsDialog')
+};
+
+/* ── Settings I/O ── */
+
+function readSettings() {
   const s = {};
-  for (const id of presetFields.numbers) s[id] = parseFloat($(id).value);
-  for (const id of presetFields.ranges) s[id] = parseFloat($(id).value);
-  for (const id of presetFields.checks) s[id] = $(id).checked;
-  for (const id of presetFields.selects) s[id] = $(id).value;
+  for (const el of els.form.elements) {
+    if (!el.name) continue;
+    if (el.type === 'radio') { if (el.checked) s[el.name] = el.value; }
+    else if (el.type === 'checkbox') s[el.name] = el.checked;
+    else if (el.type === 'number' || el.type === 'range') s[el.name] = parseFloat(el.value);
+    else s[el.name] = el.value;
+  }
   return s;
 }
 
-function applySettings(s) {
-  for (const id of presetFields.numbers) if (s[id] !== undefined) $(id).value = s[id];
-  for (const id of presetFields.ranges) if (s[id] !== undefined) $(id).value = s[id];
-  for (const id of presetFields.checks) if (s[id] !== undefined) $(id).checked = s[id];
-  for (const id of presetFields.selects) if (s[id] !== undefined) $(id).value = s[id];
-
-  // Update displays
-  curveResVal.textContent = curveRes.value;
-  hatchSpacingVal.textContent = hatchSpacing.value;
-  hatchAngleVal.textContent = hatchAngle.value + '°';
-  hatchPanel.classList.toggle('hatch-disabled', !hatchEnable.checked);
-  updateHatchPreview();
+function writeSettings(input) {
+  const s = { ...input };
+  // Legacy presets (v1): fitPage boolean
+  if (s.fitPage !== undefined && s.scaleMode === undefined) s.scaleMode = s.fitPage ? 'fit' : 'real';
+  if (s.pageW !== undefined && s.pageH !== undefined && s.orientation === undefined) {
+    s.orientation = s.pageW > s.pageH ? 'landscape' : 'portrait';
+  }
+  for (const el of els.form.elements) {
+    if (!el.name || !(el.name in s) || s[el.name] === undefined || s[el.name] === null) continue;
+    const v = s[el.name];
+    if (el.type === 'radio') el.checked = String(v) === el.value;
+    else if (el.type === 'checkbox') el.checked = !!v;
+    else el.value = v;
+  }
+  syncControls();
 }
 
-function downloadPreset(name, settings) {
-  const data = {
-    name,
-    version: 1,
-    created: new Date().toISOString(),
-    settings
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+function saveSettingsLocal() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(readSettings())); } catch (e) { /* storage unavailable */ }
+}
 
+function loadSettingsLocal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+function setRangeFill(r) {
+  const pct = ((r.value - r.min) / (r.max - r.min)) * 100;
+  r.style.setProperty('--pct', pct + '%');
+}
+
+function syncControls() {
+  const s = readSettings();
+  $('#curveResOut').textContent = s.curveRes;
+  $('#hatchSpacingOut').textContent = fmtNum(s.hatchSpacing, 1) + ' mm';
+  $('#hatchAngleOut').textContent = s.hatchAngle + '°';
+  $$('input[type="range"]').forEach(setRangeFill);
+  $('#hatchFields').disabled = !s.hatchEnable;
+  $('#scalePctField').hidden = s.scaleMode !== 'custom';
+  $('#hatchPill').textContent = s.hatchEnable ? (s.hatchType === 'cross' ? 'Croisées' : 'Lignes') : 'Off';
+  const fmt = PAGE_FORMATS[s.pageFormat];
+  $('#pagePill').textContent = fmt ? s.pageFormat.toUpperCase().replace('LETTER', 'Letter') : `${fmtNum(s.pageW)}×${fmtNum(s.pageH)}`;
+  updateHatchPreview(s);
+}
+
+function validate(s) {
+  const errs = {};
+  if (!(s.pageW > 0)) errs.pageW = 'Largeur invalide';
+  if (!(s.pageH > 0)) errs.pageH = 'Hauteur invalide';
+  if (!(s.margin >= 0)) errs.margin = 'La marge doit être positive ou nulle';
+  else if (s.pageW > 0 && s.pageH > 0 && 2 * s.margin >= Math.min(s.pageW, s.pageH)) errs.margin = 'La marge est plus grande que la page';
+  if (s.scaleMode === 'custom' && !(s.scalePct > 0)) errs.scalePct = 'Facteur invalide';
+  if (!(s.speedDraw > 0)) errs.speedDraw = 'Vitesse invalide';
+  if (!(s.speedTravel > 0)) errs.speedTravel = 'Vitesse invalide';
+
+  for (const id of ['pageW', 'pageH', 'margin', 'scalePct', 'speedDraw', 'speedTravel']) {
+    const el = $('#' + id);
+    if (errs[id]) el.setAttribute('aria-invalid', 'true'); else el.removeAttribute('aria-invalid');
+  }
+  $('#pageError').textContent = errs.pageW || errs.pageH || errs.margin || '';
+  return Object.keys(errs).length ? errs : null;
+}
+
+/* ── Hatch preview (sidebar) ── */
+function updateHatchPreview(s = readSettings()) {
+  const svg = $('#hatchPreview');
+  const NS = 'http://www.w3.org/2000/svg';
+  svg.textContent = '';
+  // Rounded rectangle + circle hole to show even-odd behaviour
+  const rect = [];
+  const x = 40, y = 12, w = 160, h = 56;
+  rect.push({ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h });
+  const hole = [];
+  for (let i = 0; i < 32; i++) {
+    const a = i / 32 * Math.PI * 2;
+    hole.push({ x: 120 + 16 * Math.cos(a), y: 40 + 16 * Math.sin(a) });
+  }
+  const spacing = Math.max(2.5, s.hatchSpacing * 8);
+  const angles = [-s.hatchAngle];
+  if (s.hatchType === 'cross') angles.push(-((s.hatchAngle + 90) % 180));
+  let d = '';
+  for (const a of angles) {
+    for (const l of generateHatch([rect, hole], spacing, a, false)) {
+      d += `M${l[0].x.toFixed(1)} ${l[0].y.toFixed(1)}L${l[1].x.toFixed(1)} ${l[1].y.toFixed(1)}`;
+    }
+  }
+  const hatch = document.createElementNS(NS, 'path');
+  hatch.setAttribute('d', d);
+  hatch.setAttribute('stroke', 'currentColor');
+  hatch.setAttribute('stroke-width', '1');
+  hatch.setAttribute('opacity', '0.55');
+  svg.appendChild(hatch);
+  if (s.hatchContoursAlso || !s.hatchEnable) {
+    const outline = document.createElementNS(NS, 'path');
+    outline.setAttribute('d', `M${x} ${y}h${w}v${h}h${-w}Z M136 40a16 16 0 1 0 -32 0a16 16 0 1 0 32 0Z`);
+    outline.setAttribute('fill', 'none');
+    outline.setAttribute('stroke', 'currentColor');
+    outline.setAttribute('stroke-width', '1.5');
+    svg.appendChild(outline);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   10. FILE HANDLING
+   ═══════════════════════════════════════════════ */
+
+function loadFile(file) {
+  if (!file) return;
+  const isSvg = /\.svg$/i.test(file.name) || file.type === 'image/svg+xml';
+  if (!isSvg) {
+    toast('Format non pris en charge. Sélectionnez un fichier .svg', 'error');
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    toast('Fichier volumineux (> 20 Mo) : la conversion peut prendre du temps', 'warn');
+  }
+  setBusy(true);
+  const reader = new FileReader();
+  reader.onload = () => openSvg(file.name, file.size, reader.result);
+  reader.onerror = () => { setBusy(false); toast('Impossible de lire le fichier', 'error'); };
+  reader.readAsText(file);
+}
+
+function openSvg(name, size, text) {
+  let info;
+  try {
+    info = analyzeSvg(text);
+  } catch (e) {
+    setBusy(false);
+    toast(e.message, 'error');
+    return;
+  }
+  if (state.file?.url) URL.revokeObjectURL(state.file.url);
+  // Render the source through <img> (sandboxed: no scripts, no external loads)
+  const url = URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' }));
+  state.file = { name, size, text, url, base: name.replace(/\.svg$/i, '') || 'gravure' };
+  state.info = info;
+  state.geomCache.clear();
+  state.view.fitted = true;
+
+  els.fileThumb.src = url;
+  els.sourceImg.src = url;
+  els.fileName.textContent = name;
+  els.fileName.title = name;
+  els.topbarFile.innerHTML = `<b>${escapeHtml(name)}</b>`;
+  els.footerName.textContent = state.file.base + '.plt';
+  els.fileEmpty.hidden = true;
+  els.fileCard.hidden = false;
+  els.empty.hidden = true;
+  $$('.tab').forEach(t => { t.disabled = false; });
+
+  // Yield so the skeleton paints before the (synchronous) conversion
+  requestAnimationFrame(() => setTimeout(() => {
+    convert();
+    setBusy(false);
+    fitView();
+  }, 0));
+}
+
+function closeFile() {
+  if (state.file?.url) URL.revokeObjectURL(state.file.url);
+  state.file = null;
+  state.info = null;
+  state.result = null;
+  state.geomCache.clear();
+  stopSim();
+  els.fileCard.hidden = true;
+  els.fileEmpty.hidden = false;
+  els.empty.hidden = false;
+  els.topbarFile.textContent = 'SVG → PLT · HPGL';
+  els.footerName.textContent = 'Aucun fichier';
+  els.fileThumb.removeAttribute('src');
+  els.sourceImg.removeAttribute('src');
+  els.fileInput.value = '';
+  selectTab('preview');
+  $$('.tab').forEach(t => { if (t.dataset.tab !== 'preview') t.disabled = true; });
+  setIssues([]);
+  updateOutputs();
+  requestRender();
+}
+
+function setBusy(on) {
+  els.wsBody.classList.toggle('is-busy', on);
+}
+
+/* ═══════════════════════════════════════════════
+   11. CONVERT & OUTPUTS
+   ═══════════════════════════════════════════════ */
+
+let convertTimer = 0;
+function scheduleConvert(delay = 120) {
+  clearTimeout(convertTimer);
+  if (!state.info) return;
+  // Show a skeleton only when the last run was slow enough to be noticed
+  if (state.lastDuration > 150) setBusy(true);
+  convertTimer = setTimeout(() => {
+    requestAnimationFrame(() => setTimeout(() => { convert(); setBusy(false); }, 0));
+  }, delay);
+}
+
+function convert() {
+  if (!state.info) return;
+  const s = readSettings();
+  const errs = validate(s);
+  if (errs) {
+    state.result = null;
+    setIssues([{ level: 'error', text: 'Paramètres invalides : ' + Object.values(errs)[0] + '.' }]);
+    updateOutputs();
+    requestRender();
+    return;
+  }
+
+  const t0 = performance.now();
+  try {
+    let shapes = state.geomCache.get(s.curveRes);
+    if (!shapes) {
+      shapes = extractGeometry(state.info, s.curveRes);
+      state.geomCache.set(s.curveRes, shapes);
+    }
+    const issues = [];
+    if (!shapes.length) {
+      state.result = null;
+      issues.push({ level: 'error', text: 'Aucun élément vectoriel exploitable dans ce fichier (chemins, formes, lignes).' });
+      if (state.info.textCount) issues.push({ level: 'warn', text: textWarning(state.info.textCount) });
+      setIssues(issues);
+      updateOutputs();
+      requestRender();
+      return;
+    }
+
+    const layout = layoutShapes(shapes, state.info, s);
+    const { strokes, hatchCount } = buildStrokes(layout, s);
+    const ordered = s.optimize ? orderStrokes(strokes) : strokes;
+    const plt = emitHPGL(ordered);
+    const timeSec = plt.drawMM / s.speedDraw + plt.travelMM / s.speedTravel;
+
+    state.result = { ...plt, layout, settings: s, elemCount: shapes.length, hatchCount, timeSec };
+
+    if (state.info.textCount) issues.push({ level: 'warn', text: textWarning(state.info.textCount) });
+    if (state.info.imageCount) issues.push({ level: 'warn', text: `${state.info.imageCount} image(s) bitmap ignorée(s) — seuls les tracés vectoriels sont convertis.` });
+    if (layout.overflow) issues.push({ level: 'error', text: 'Le dessin dépasse de la page. Réduisez l\'échelle ou passez en mode « Ajuster ».' });
+    else if (layout.outsideMargin) issues.push({ level: 'warn', text: 'Le dessin empiète sur la marge de sécurité.' });
+    if (s.scaleMode !== 'fit' && !state.info.hasPhysicalSize) issues.push({ level: 'info', text: 'Le SVG ne déclare pas de dimensions physiques : 1 unité = 1 px (0,265 mm).' });
+    if (s.hatchEnable && !hatchCount) issues.push({ level: 'info', text: 'Aucune forme fermée à hachurer dans ce fichier.' });
+    setIssues(issues);
+  } catch (e) {
+    console.error(e);
+    state.result = null;
+    setIssues([{ level: 'error', text: 'Erreur de conversion : ' + e.message }]);
+  }
+  state.lastDuration = performance.now() - t0;
+  updateOutputs();
+  if (state.view.fitted) fitView(); else requestRender();
+}
+
+function textWarning(n) {
+  return `${n} élément(s) <text> ignoré(s). Convertissez les textes en tracés dans votre éditeur (Inkscape : Chemin › Objet en chemin).`;
+}
+
+function setIssues(list) {
+  els.issues.innerHTML = list.map(it =>
+    `<div class="issue ${it.level}">${iconSvg(it.level === 'error' ? 'error' : it.level === 'warn' ? 'warn' : 'info')}<span>${escapeHtml(it.text)}</span></div>`
+  ).join('');
+}
+
+function setStat(id, text) {
+  const el = $('#' + id);
+  el.textContent = text;
+  el.classList.toggle('muted', text === '—');
+}
+
+function updateOutputs() {
+  const r = state.result;
+  els.btnDownload.disabled = !r;
+  if (state.file) {
+    const meta = [fmtBytes(state.file.size)];
+    if (state.info?.docW && state.info?.docH) meta.push(`${fmtNum(state.info.docW)} × ${fmtNum(state.info.docH)} mm`);
+    if (r) meta.push(`${r.elemCount} élém.`);
+    els.fileMeta.textContent = meta.join(' · ');
+  }
+  if (!r) {
+    for (const id of ['statOut', 'statTime', 'statDraw', 'statTravel', 'statElems', 'statHatch', 'statCmds', 'statSize']) setStat(id, '—');
+    els.footerSize.textContent = '';
+    els.code.textContent = '';
+    els.codeNote.textContent = '';
+    return;
+  }
+  const b = r.layout.bounds;
+  setStat('statOut', `${fmtNum(b.w)} × ${fmtNum(b.h)} mm`);
+  setStat('statTime', fmtDuration(r.timeSec));
+  setStat('statDraw', fmtLen(r.drawMM));
+  setStat('statTravel', fmtLen(r.travelMM));
+  setStat('statElems', fmtInt(r.elemCount));
+  setStat('statHatch', fmtInt(r.hatchCount));
+  setStat('statCmds', fmtInt(r.cmdCount));
+  setStat('statSize', fmtBytes(r.text.length));
+  els.footerSize.textContent = fmtBytes(r.text.length);
+  if (state.tab === 'code') renderCode();
+}
+
+/* ── Code view ── */
+const CODE_MAX_LINES = 3000;
+function renderCode() {
+  const r = state.result;
+  if (!r) { els.code.textContent = ''; els.codeNote.textContent = ''; return; }
+  if (els.code.dataset.for === r.text.length + ':' + r.cmdCount && els.code.childElementCount) return;
+  const lines = r.text.split('\n');
+  if (lines[lines.length - 1] === '') lines.pop();
+  const shown = lines.slice(0, CODE_MAX_LINES);
+  els.code.innerHTML = shown.map(l => {
+    const cls = /^PU/.test(l) ? 'tk-pu' : /^PD/.test(l) ? 'tk-pd' : 'tk-init';
+    return `<span class="ln"><span class="${cls}">${escapeHtml(l)}</span></span>`;
+  }).join('');
+  els.code.dataset.for = r.text.length + ':' + r.cmdCount;
+  els.codeNote.textContent = lines.length > CODE_MAX_LINES
+    ? `… ${fmtInt(lines.length - CODE_MAX_LINES)} lignes supplémentaires masquées. Le fichier téléchargé est complet.`
+    : `${fmtInt(lines.length)} lignes · fin du fichier`;
+}
+
+/* ═══════════════════════════════════════════════
+   12. CANVAS PREVIEW
+   ═══════════════════════════════════════════════ */
+
+const ctx = els.canvas.getContext('2d');
+let renderQueued = false;
+let cssW = 0, cssH = 0;
+
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  const v = n => cs.getPropertyValue(n).trim();
+  state.colors = { bg: v('--bg'), bg2: v('--bg-2'), border: v('--border'), text: v('--text'), text2: v('--text-2'), success: v('--success') };
+}
+
+function pageSize() {
+  const s = readSettings();
+  return { W: s.pageW > 0 ? s.pageW : 210, H: s.pageH > 0 ? s.pageH : 297, m: s.margin >= 0 ? s.margin : 0 };
+}
+
+function fitView() {
+  const { W, H } = pageSize();
+  if (!cssW || !cssH) return;
+  const pad = cssW < 480 ? 24 : 48;
+  const zoom = Math.max(0.01, Math.min((cssW - 2 * pad) / W, (cssH - 2 * pad - 32) / H));
+  state.view.zoom = zoom;
+  state.view.fitZoom = zoom;
+  state.view.x = (cssW - W * zoom) / 2;
+  state.view.y = (cssH + H * zoom) / 2;
+  state.view.fitted = true;
+  requestRender();
+}
+
+function zoomAt(mx, my, factor) {
+  const v = state.view;
+  const nz = Math.min(v.fitZoom * 400, Math.max(v.fitZoom * 0.2, v.zoom * factor));
+  const f = nz / v.zoom;
+  v.x = mx - (mx - v.x) * f;
+  v.y = my - (my - v.y) * f;
+  v.zoom = nz;
+  v.fitted = false;
+  requestRender();
+}
+
+function requestRender() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; render(); });
+}
+
+function resizeCanvas() {
+  const rect = els.viewport.getBoundingClientRect();
+  cssW = rect.width; cssH = rect.height;
+  const dpr = window.devicePixelRatio || 1;
+  els.canvas.width = Math.max(1, Math.round(cssW * dpr));
+  els.canvas.height = Math.max(1, Math.round(cssH * dpr));
+  if (state.view.fitted) fitView(); else requestRender();
+}
+
+function render() {
+  if (!state.colors) readColors();
+  const C = state.colors;
+  const dpr = window.devicePixelRatio || 1;
+  const v = state.view;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
+  els.zoomVal.textContent = Math.round((v.zoom / (v.fitZoom || 1)) * 100) + '%';
+  if (!state.file) return;
+
+  const { W, H, m } = pageSize();
+  const z = v.zoom;
+  // World (mm, Y up) → device pixels
+  ctx.setTransform(dpr * z, 0, 0, -dpr * z, dpr * v.x, dpr * v.y);
+  const px = 1 / z; // one CSS pixel in mm
+
+  // Sheet
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.lineWidth = px;
+  ctx.strokeStyle = C.border;
+  ctx.strokeRect(0, 0, W, H);
+  // Margin
+  if (m > 0) {
+    ctx.setLineDash([4 * px, 4 * px]);
+    ctx.strokeRect(m, m, W - 2 * m, H - 2 * m);
+    ctx.setLineDash([]);
+  }
+
+  const r = state.result;
+  if (!r) return;
+
+  const plot = r.plot;
+  const total = plot.length;
+  const limit = state.sim.on ? state.sim.progress : 1;
+  const shown = Math.max(0, Math.min(total, Math.round(total * limit)));
+
+  // Travel moves
+  if (state.showTravel && shown > 0) {
+    ctx.beginPath();
+    let lx = 0, ly = 0;
+    for (let i = 0; i < shown; i++) {
+      const p = plot[i].pts;
+      if (i > 0 && (p[0] !== lx || p[1] !== ly)) { ctx.moveTo(lx, ly); ctx.lineTo(p[0], p[1]); }
+      lx = p[p.length - 2]; ly = p[p.length - 1];
+    }
+    ctx.setLineDash([3 * px, 3 * px]);
+    ctx.strokeStyle = C.success;
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = px;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
+
+  // Ghost of the remaining job during simulation
+  if (shown < total) {
+    ctx.beginPath();
+    for (let i = shown; i < total; i++) tracePts(plot[i].pts);
+    ctx.strokeStyle = C.border;
+    ctx.lineWidth = px;
+    ctx.stroke();
+  }
+
+  // Burned paths: hatches first (thinner), then contours on top
+  const beam = Math.min(0.15, px * 4); // ~beam width when zoomed in
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = C.text;
+  for (const kind of ['hatch', 'contour']) {
+    ctx.beginPath();
+    for (let i = 0; i < shown; i++) if (plot[i].kind === kind) tracePts(plot[i].pts);
+    ctx.lineWidth = Math.max(kind === 'hatch' ? px * 0.6 : px * 1.25, beam);
+    ctx.globalAlpha = kind === 'hatch' ? 0.75 : 1;
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Head position
+  if (state.sim.on && shown > 0 && shown < total) {
+    const p = plot[shown - 1].pts;
+    ctx.beginPath();
+    ctx.arc(p[p.length - 2], p[p.length - 1], 4 * px, 0, Math.PI * 2);
+    ctx.fillStyle = C.success;
+    ctx.fill();
+  }
+}
+
+function tracePts(p) {
+  ctx.moveTo(p[0], p[1]);
+  for (let j = 2; j < p.length; j += 2) ctx.lineTo(p[j], p[j + 1]);
+}
+
+/* ── Pointer interaction: pan, pinch, wheel ── */
+const pointers = new Map();
+let pinchStart = null;
+
+els.viewport.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  els.viewport.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinchStart = { d: Math.hypot(a.x - b.x, a.y - b.y), zoom: state.view.zoom };
+  }
+  els.viewport.classList.add('panning');
+});
+els.viewport.addEventListener('pointermove', e => {
+  const rect = els.viewport.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  if (state.file) {
+    const X = (mx - state.view.x) / state.view.zoom, Y = (state.view.y - my) / state.view.zoom;
+    els.hudCoords.textContent = `X ${fmtNum(X, 1)} · Y ${fmtNum(Y, 1)} mm`;
+  }
+  const prev = pointers.get(e.pointerId);
+  if (!prev) return;
+  if (pointers.size === 1) {
+    state.view.x += e.clientX - prev.x;
+    state.view.y += e.clientY - prev.y;
+    state.view.fitted = false;
+    requestRender();
+  }
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2 && pinchStart) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    const cx = (a.x + b.x) / 2 - rect.left, cy = (a.y + b.y) / 2 - rect.top;
+    zoomAt(cx, cy, (pinchStart.zoom * d / pinchStart.d) / state.view.zoom);
+  }
+});
+const endPointer = e => {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinchStart = null;
+  if (!pointers.size) els.viewport.classList.remove('panning');
+};
+els.viewport.addEventListener('pointerup', endPointer);
+els.viewport.addEventListener('pointercancel', endPointer);
+els.viewport.addEventListener('lostpointercapture', endPointer);
+els.viewport.addEventListener('pointerleave', () => { els.hudCoords.textContent = 'X — · Y —'; });
+els.viewport.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = els.viewport.getBoundingClientRect();
+  const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+  zoomAt(e.clientX - rect.left, e.clientY - rect.top, Math.exp(-delta * 0.0015));
+}, { passive: false });
+els.viewport.addEventListener('dblclick', fitView);
+
+new ResizeObserver(resizeCanvas).observe(els.viewport);
+
+/* ── Simulation ── */
+function stopSim() {
+  state.sim.playing = false;
+  cancelAnimationFrame(state.sim.raf);
+  $('#btnSimPlay').innerHTML = iconSvg('play');
+  $('#btnSimPlay').setAttribute('aria-label', 'Lecture');
+}
+function setSimProgress(p) {
+  state.sim.progress = Math.max(0, Math.min(1, p));
+  els.simRange.value = Math.round(state.sim.progress * 1000);
+  setRangeFill(els.simRange);
+  els.simOut.textContent = Math.round(state.sim.progress * 100) + '%';
+  requestRender();
+}
+function playSim() {
+  if (!state.result) return;
+  if (state.sim.progress >= 1) setSimProgress(0);
+  state.sim.playing = true;
+  $('#btnSimPlay').innerHTML = iconSvg('pause');
+  $('#btnSimPlay').setAttribute('aria-label', 'Pause');
+  let last = performance.now();
+  const durationMs = 6000;
+  const step = now => {
+    if (!state.sim.playing) return;
+    setSimProgress(state.sim.progress + (now - last) / durationMs);
+    last = now;
+    if (state.sim.progress >= 1) { stopSim(); return; }
+    state.sim.raf = requestAnimationFrame(step);
+  };
+  state.sim.raf = requestAnimationFrame(step);
+}
+
+/* ═══════════════════════════════════════════════
+   13. UI HELPERS (tabs, toasts, tooltips, theme)
+   ═══════════════════════════════════════════════ */
+
+function selectTab(name) {
+  state.tab = name;
+  for (const t of $$('.tab')) {
+    const on = t.dataset.tab === name;
+    t.setAttribute('aria-selected', on);
+    t.tabIndex = on ? 0 : -1;
+    $('#panel-' + t.dataset.tab).hidden = !on;
+  }
+  $('#tools-preview').hidden = name !== 'preview';
+  $('#tools-code').hidden = name !== 'code';
+  if (name === 'code') renderCode();
+  if (name === 'preview') resizeCanvas();
+}
+
+function toast(message, type = 'success') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  el.innerHTML = iconSvg(type === 'success' ? 'check' : type === 'error' ? 'error' : type === 'warn' ? 'warn' : 'info') + `<span>${escapeHtml(message)}</span>`;
+  els.toasts.appendChild(el);
+  setTimeout(() => {
+    el.classList.add('out');
+    el.addEventListener('animationend', () => el.remove(), { once: true });
+  }, type === 'error' ? 5000 : 3000);
+}
+
+function showTip(btn) {
+  const tip = els.tooltip;
+  tip.textContent = btn.dataset.tip;
+  tip.classList.add('visible');
+  btn.setAttribute('aria-describedby', 'tooltip');
+  const r = btn.getBoundingClientRect();
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  let left = r.left + r.width / 2 - tw / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+  let top = r.bottom + 8;
+  if (top + th > window.innerHeight - 8) top = r.top - th - 8;
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+}
+function hideTip(btn) {
+  els.tooltip.classList.remove('visible');
+  btn?.removeAttribute('aria-describedby');
+}
+
+function currentTheme() {
+  const t = document.documentElement.dataset.theme;
+  if (t === 'dark' || t === 'light') return t;
+  return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function onThemeChange() {
+  readColors();
+  requestRender();
+}
+
+async function saveBlob(blob, filename, description, ext) {
   if (window.showSaveFilePicker) {
-    window.showSaveFilePicker({
-      suggestedName: name.replace(/\s+/g, '_') + '.json',
-      types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
-    }).then(async handle => {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description, accept: { [blob.type || 'application/octet-stream']: [ext] } }]
+      });
       const w = await handle.createWritable();
       await w.write(blob);
       await w.close();
-    }).catch(() => fallbackDownload(blob, name.replace(/\s+/g, '_') + '.json'));
-  } else {
-    fallbackDownload(blob, name.replace(/\s+/g, '_') + '.json');
-  }
-}
-
-function loadPresetFromFile(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const data = JSON.parse(reader.result);
-      if (data.settings) applySettings(data.settings);
+      return true;
     } catch (e) {
-      showError('Fichier preset invalide : ' + e.message);
+      if (e.name === 'AbortError') return false; // user cancelled
+      // Fall through to classic download
     }
-  };
-  reader.readAsText(file);
-}
-
-// ══════════════════════════════════════════════════
-// 9. FILE HANDLING
-// ══════════════════════════════════════════════════
-
-function loadFile(file) {
-  if (!file.name.toLowerCase().endsWith('.svg')) {
-    showError('Veuillez sélectionner un fichier .SVG');
-    return;
   }
-  if (file.size > 5 * 1024 * 1024) {
-    showError('Attention : le fichier dépasse 5 Mo. La conversion pourrait être lente.');
-  }
-  svgBaseName = file.name.replace(/\.svg$/i, '');
-  const reader = new FileReader();
-  reader.onload = () => {
-    svgContent = reader.result;
-    fileName.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} Ko)`;
-    fileInfo.classList.add('visible');
-    btnConvert.disabled = false;
-    placeholder.classList.add('hidden');
-
-    // Show SVG preview
-    svgPreview.innerHTML = svgContent;
-    svgPreview.classList.add('visible');
-  };
-  reader.readAsText(file);
-}
-
-function resetOutput() {
-  alertText.classList.remove('visible');
-  alertHatch.classList.remove('visible');
-  alertSuccess.classList.remove('visible');
-  alertError.classList.remove('visible');
-  pltPreview.classList.remove('visible');
-  pltCanvas.classList.remove('visible');
-  pltViewToggle.classList.remove('visible');
-  statsBar.classList.remove('visible');
-  btnDownload.classList.remove('visible');
-}
-
-function showError(msg) {
-  alertError.textContent = msg;
-  alertError.classList.add('visible');
-}
-
-function fallbackDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
 }
 
-// ══════════════════════════════════════════════════
-// 9b. PLT CANVAS RENDERER
-// ══════════════════════════════════════════════════
-
-function renderPltCanvas(pltStr) {
-  const cmdRe = /(PU|PD)(\d+),(\d+);/g;
-  const moves = [];
-  let m;
-  while ((m = cmdRe.exec(pltStr)) !== null) {
-    moves.push({ type: m[1], x: parseInt(m[2]), y: parseInt(m[3]) });
-  }
-  if (!moves.length) return;
-
-  // Bounding box
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const mv of moves) {
-    if (mv.x < minX) minX = mv.x;
-    if (mv.y < minY) minY = mv.y;
-    if (mv.x > maxX) maxX = mv.x;
-    if (mv.y > maxY) maxY = mv.y;
-  }
-
-  const bbW = maxX - minX || 1;
-  const bbH = maxY - minY || 1;
-  const pad = 20;
-
-  // Adjust canvas size to aspect ratio
-  const aspect = bbW / bbH;
-  const canvasW = 800;
-  const canvasH = Math.round(canvasW / aspect);
-  pltCanvas.width = canvasW;
-  pltCanvas.height = Math.max(200, Math.min(canvasH, 600));
-
-  const scaleX = (pltCanvas.width - 2 * pad) / bbW;
-  const scaleY = (pltCanvas.height - 2 * pad) / bbH;
-  const scale = Math.min(scaleX, scaleY);
-  const offX = pad + (pltCanvas.width - 2 * pad - bbW * scale) / 2;
-  const offY = pad + (pltCanvas.height - 2 * pad - bbH * scale) / 2;
-
-  function tx(x) { return offX + (x - minX) * scale; }
-  function ty(y) { return offY + (maxY - y) * scale; } // invert Y for canvas
-
-  const ctx = pltCanvas.getContext('2d');
-  ctx.clearRect(0, 0, pltCanvas.width, pltCanvas.height);
-
-  let prevX = 0, prevY = 0;
-  for (const mv of moves) {
-    const cx = tx(mv.x), cy = ty(mv.y);
-    if (mv.type === 'PU') {
-      // Move: light dashed blue line
-      ctx.beginPath();
-      ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = 'rgba(42, 108, 182, 0.25)';
-      ctx.lineWidth = 0.5;
-      ctx.moveTo(prevX, prevY);
-      ctx.lineTo(cx, cy);
-      ctx.stroke();
-    } else {
-      // Draw: solid orange line
-      ctx.beginPath();
-      ctx.setLineDash([]);
-      ctx.strokeStyle = '#c44b1a';
-      ctx.lineWidth = 1.5;
-      ctx.moveTo(prevX, prevY);
-      ctx.lineTo(cx, cy);
-      ctx.stroke();
-    }
-    prevX = cx;
-    prevY = cy;
-  }
+async function downloadPlt() {
+  if (!state.result) return;
+  const blob = new Blob([state.result.text], { type: 'application/octet-stream' });
+  const name = state.file.base + '.plt';
+  if (await saveBlob(blob, name, 'Fichier PLT (HPGL)', '.plt')) toast(`${name} enregistré`);
 }
 
-// ══════════════════════════════════════════════════
-// 10. EVENT LISTENERS
-// ══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════
+   14. EVENTS
+   ═══════════════════════════════════════════════ */
 
-// File input
-fileInput.addEventListener('change', e => {
-  if (e.target.files[0]) loadFile(e.target.files[0]);
+// File pickers
+const openPicker = () => els.fileInput.click();
+els.fileInput.addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
+els.fileEmpty.addEventListener('click', openPicker);
+$('#btnReplace').addEventListener('click', openPicker);
+$('#btnRemove').addEventListener('click', closeFile);
+$('#btnBrowse').addEventListener('click', e => { e.stopPropagation(); openPicker(); });
+$('#btnSample').addEventListener('click', e => {
+  e.stopPropagation();
+  openSvg('exemple.svg', SAMPLE_SVG.length, SAMPLE_SVG);
+});
+$('#emptyCard').addEventListener('click', openPicker);
+$('#emptyCard').addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); openPicker(); }
 });
 
-// Drag & drop
-dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
-dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
-dropzone.addEventListener('drop', e => {
+// Window-wide drag & drop
+let dragDepth = 0;
+const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
+window.addEventListener('dragenter', e => {
+  if (!hasFiles(e)) return;
   e.preventDefault();
-  dropzone.classList.remove('drag-over');
-  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+  dragDepth++;
+  els.dropOverlay.classList.add('visible');
+});
+window.addEventListener('dragover', e => { if (hasFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+window.addEventListener('dragleave', e => {
+  if (!hasFiles(e)) return;
+  if (--dragDepth <= 0) { dragDepth = 0; els.dropOverlay.classList.remove('visible'); }
+});
+window.addEventListener('drop', e => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  els.dropOverlay.classList.remove('visible');
+  const file = e.dataTransfer.files[0];
+  if (/\.json$/i.test(file?.name || '')) loadPresetFile(file);
+  else loadFile(file);
 });
 
-// Page format
-pageFormat.addEventListener('change', () => {
-  const formats = { a4: [210, 297], a3: [297, 420], a2: [420, 594], letter: [216, 279] };
-  const f = formats[pageFormat.value];
-  if (f) {
-    $('pageW').value = f[0];
-    $('pageH').value = f[1];
-  }
-});
-
-// Range sliders
-curveRes.addEventListener('input', () => curveResVal.textContent = curveRes.value);
-hatchSpacing.addEventListener('input', () => { hatchSpacingVal.textContent = hatchSpacing.value; updateHatchPreview(); });
-hatchAngle.addEventListener('input', () => { hatchAngleVal.textContent = hatchAngle.value + '°'; updateHatchPreview(); });
-$('hatchType').addEventListener('change', () => updateHatchPreview());
-
-// Hatch enable toggle
-hatchEnable.addEventListener('change', () => {
-  hatchPanel.classList.toggle('hatch-disabled', !hatchEnable.checked);
-});
-
-// Convert
-btnConvert.addEventListener('click', () => {
-  resetOutput();
-
-  const pageW = parseFloat($('pageW').value);
-  const pageH = parseFloat($('pageH').value);
-  const marginVal = parseFloat($('margin').value);
-
-  if (!pageW || pageW <= 0 || !pageH || pageH <= 0) {
-    showError('Les dimensions de la page doivent être supérieures à 0.');
-    return;
-  }
-  if (isNaN(marginVal) || marginVal < 0) {
-    showError('La marge doit être un nombre positif ou nul.');
-    return;
-  }
-
-  const opts = {
-    pageW: pageW || 210,
-    pageH: pageH || 297,
-    margin: marginVal || 5,
-    curveRes: parseInt(curveRes.value) || 32,
-    fitPage: $('fitPage').checked,
-    hatchEnable: hatchEnable.checked,
-    hatchType: $('hatchType').value,
-    hatchSpacing: parseFloat(hatchSpacing.value) || 0.5,
-    hatchAngle: parseFloat(hatchAngle.value) || 45,
-    hatchBidirectional: $('hatchBidirectional').checked,
-    hatchContoursAlso: $('hatchContoursAlso').checked
-  };
-
-  // Loading state
-  btnConvert.textContent = 'Conversion…';
-  btnConvert.classList.add('loading');
-
-  setTimeout(() => {
-    try {
-      pltResult = convertSVGtoPLT(svgContent, opts);
-
-      // Warnings
-      if (pltResult.hasText) {
-        alertText.textContent = 'Le fichier contient des éléments <text> qui ne seront pas convertis. Convertissez-les en chemins dans votre éditeur SVG.';
-        alertText.classList.add('visible');
-      }
-      if (pltResult.hatchLineCount > 0) {
-        alertHatch.textContent = `${pltResult.hatchLineCount} lignes de hachures générées. Vérifiez le résultat avant gravure.`;
-        alertHatch.classList.add('visible');
-      }
-
-      // Success
-      alertSuccess.textContent = `Conversion réussie — ${pltResult.cmdCount} commandes HPGL générées.`;
-      alertSuccess.classList.add('visible');
-
-      // Stats
-      $('statCmds').textContent = pltResult.cmdCount.toLocaleString('fr-FR');
-      $('statDist').textContent = pltResult.distMM.toLocaleString('fr-FR') + ' mm';
-      $('statElems').textContent = pltResult.elemCount;
-      $('statHatch').textContent = pltResult.hatchLineCount;
-      $('statSize').textContent = (pltResult.pltStr.length / 1024).toFixed(1) + ' Ko';
-      statsBar.classList.add('visible');
-
-      // Canvas preview
-      renderPltCanvas(pltResult.pltStr);
-      pltCanvas.classList.toggle('visible', pltViewMode === 'canvas');
-
-      // PLT text preview with syntax highlighting
-      let display = pltResult.pltStr;
-      if (display.length > 5000) display = display.substring(0, 5000) + '\n… (tronqué à 5000 caractères)';
-
-      display = display
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/(IN;|SP\d+;|VS\d+;)/g, '<span class="cmd-init">$1</span>')
-        .replace(/(PU[^;]*;)/g, '<span class="cmd-move">$1</span>')
-        .replace(/(PD[^;]*;)/g, '<span class="cmd-draw">$1</span>');
-
-      pltCode.innerHTML = display;
-      pltCode.style.display = pltViewMode === 'text' ? '' : 'none';
-      pltViewToggle.classList.add('visible');
-      pltPreview.classList.add('visible');
-
-      // Download button
-      btnDownload.classList.add('visible');
-
-    } catch (e) {
-      if (e.message.includes('introuvable')) {
-        showError('Le fichier ne contient pas de SVG valide. Vérifiez qu\'il s\'agit bien d\'un fichier .svg.');
-      } else {
-        showError('Erreur de conversion : ' + e.message);
-      }
-    } finally {
-      btnConvert.textContent = 'Convertir en PLT';
-      btnConvert.classList.remove('loading');
+// Settings form
+els.form.addEventListener('submit', e => e.preventDefault());
+els.form.addEventListener('input', e => {
+  const t = e.target;
+  if (t.name === 'pageW' || t.name === 'pageH') {
+    const W = parseFloat($('#pageW').value), H = parseFloat($('#pageH').value);
+    const match = Object.entries(PAGE_FORMATS).find(([, f]) => (f[0] === W && f[1] === H) || (f[0] === H && f[1] === W));
+    $('#pageFormat').value = match ? match[0] : 'custom';
+    if (W > 0 && H > 0 && W !== H) {
+      for (const r of els.form.elements.orientation) r.checked = r.value === (W > H ? 'landscape' : 'portrait');
     }
-  }, 20);
-});
-
-// Download PLT
-btnDownload.addEventListener('click', () => {
-  if (!pltResult) return;
-  const blob = new Blob([pltResult.pltStr], { type: 'application/octet-stream' });
-  const outName = svgBaseName + '.plt';
-
-  if (window.showSaveFilePicker) {
-    window.showSaveFilePicker({
-      suggestedName: outName,
-      types: [{ description: 'PLT file', accept: { 'application/octet-stream': ['.plt'] } }]
-    }).then(async handle => {
-      const w = await handle.createWritable();
-      await w.write(blob);
-      await w.close();
-    }).catch(() => fallbackDownload(blob, outName));
-  } else {
-    fallbackDownload(blob, outName);
   }
+  syncControls();
+  saveSettingsLocal();
+  if (t.name === 'pageW' || t.name === 'pageH') state.view.fitted = true;
+  scheduleConvert(t.type === 'range' ? 80 : 200);
+});
+els.form.addEventListener('change', e => {
+  const t = e.target;
+  if (t.name === 'pageFormat') {
+    const f = PAGE_FORMATS[t.value];
+    if (f) {
+      const land = readSettings().orientation === 'landscape';
+      $('#pageW').value = land ? f[1] : f[0];
+      $('#pageH').value = land ? f[0] : f[1];
+    }
+    state.view.fitted = true;
+  }
+  if (t.name === 'orientation') {
+    const W = parseFloat($('#pageW').value), H = parseFloat($('#pageH').value);
+    const wantLand = t.value === 'landscape';
+    if ((wantLand && W < H) || (!wantLand && W > H)) {
+      $('#pageW').value = H;
+      $('#pageH').value = W;
+    }
+    state.view.fitted = true;
+  }
+  syncControls();
+  saveSettingsLocal();
+  scheduleConvert(0);
+  if (state.view.fitted) requestAnimationFrame(fitView);
 });
 
 // Presets
-$('btnSavePreset').addEventListener('click', () => {
-  presetName.value = '';
-  modalOverlay.classList.add('visible');
-  presetName.focus();
+$('#btnSavePreset').addEventListener('click', () => {
+  $('#presetName').value = '';
+  els.presetDialog.showModal();
+});
+els.presetDialog.addEventListener('close', async () => {
+  if (els.presetDialog.returnValue !== 'save') return;
+  const name = $('#presetName').value.trim() || 'preset';
+  const data = { app: 'laserplot', name, version: 2, created: new Date().toISOString(), settings: readSettings() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const file = name.replace(/[^\w\-]+/g, '_') + '.json';
+  if (await saveBlob(blob, file, 'Preset JSON', '.json')) toast(`Preset « ${name} » exporté`);
+});
+$('#btnLoadPreset').addEventListener('click', () => els.presetInput.click());
+els.presetInput.addEventListener('change', e => { loadPresetFile(e.target.files[0]); e.target.value = ''; });
+$('#btnResetSettings').addEventListener('click', () => {
+  writeSettings(DEFAULTS);
+  saveSettingsLocal();
+  state.view.fitted = true;
+  scheduleConvert(0);
+  requestAnimationFrame(fitView);
+  toast('Paramètres réinitialisés');
 });
 
-$('modalCancel').addEventListener('click', () => modalOverlay.classList.remove('visible'));
+function loadPresetFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data || typeof data.settings !== 'object') throw new Error('structure inattendue');
+      writeSettings(data.settings);
+      saveSettingsLocal();
+      state.view.fitted = true;
+      scheduleConvert(0);
+      requestAnimationFrame(fitView);
+      toast(`Preset « ${data.name || file.name} » chargé`);
+    } catch (e) {
+      toast('Preset invalide : ' + e.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+}
 
-$('modalConfirm').addEventListener('click', () => {
-  const name = presetName.value.trim() || 'preset';
-  downloadPreset(name, gatherSettings());
-  modalOverlay.classList.remove('visible');
-});
+// Light-dismiss fallback for browsers without <dialog closedby>
+if (!('closedBy' in HTMLDialogElement.prototype)) {
+  for (const dlg of [els.presetDialog, els.shortcutsDialog]) {
+    dlg.addEventListener('click', e => {
+      if (e.target !== dlg) return;
+      const r = dlg.getBoundingClientRect();
+      const inside = r.top <= e.clientY && e.clientY <= r.bottom && r.left <= e.clientX && e.clientX <= r.right;
+      if (!inside) dlg.close();
+    });
+  }
+}
 
-modalOverlay.addEventListener('click', e => {
-  if (e.target === modalOverlay) modalOverlay.classList.remove('visible');
-});
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && modalOverlay.classList.contains('visible')) {
-    modalOverlay.classList.remove('visible');
+// Download & copy
+els.btnDownload.addEventListener('click', downloadPlt);
+$('#btnCopy').addEventListener('click', async () => {
+  if (!state.result) return;
+  try {
+    await navigator.clipboard.writeText(state.result.text);
+    toast('Code HPGL copié dans le presse-papiers');
+  } catch (e) {
+    toast('Copie impossible dans ce navigateur', 'error');
   }
 });
 
-$('btnLoadPreset').addEventListener('click', () => $('presetFileInput').click());
-$('presetFileInput').addEventListener('change', e => {
-  if (e.target.files[0]) loadPresetFromFile(e.target.files[0]);
-  e.target.value = '';
+// Tabs (with arrow-key navigation)
+$('.tabs').addEventListener('click', e => {
+  const t = e.target.closest('.tab');
+  if (t && !t.disabled) selectTab(t.dataset.tab);
+});
+$('.tabs').addEventListener('keydown', e => {
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+  const tabs = $$('.tab');
+  const i = tabs.findIndex(t => t.dataset.tab === state.tab);
+  const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+  selectTab(next.dataset.tab);
+  next.focus();
 });
 
-// PLT view toggle
-pltViewToggle.addEventListener('click', e => {
-  const btn = e.target.closest('.toggle-btn');
-  if (!btn) return;
-  pltViewMode = btn.dataset.view;
-  pltViewToggle.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  pltCanvas.classList.toggle('visible', pltViewMode === 'canvas');
-  pltCode.style.display = pltViewMode === 'text' ? '' : 'none';
+// Preview tools
+$('#btnZoomIn').addEventListener('click', () => zoomAt(cssW / 2, cssH / 2, 1.25));
+$('#btnZoomOut').addEventListener('click', () => zoomAt(cssW / 2, cssH / 2, 0.8));
+$('#btnFit').addEventListener('click', fitView);
+$('#btnTravel').addEventListener('click', e => {
+  state.showTravel = !state.showTravel;
+  e.currentTarget.setAttribute('aria-pressed', state.showTravel);
+  requestRender();
 });
+$('#btnSim').addEventListener('click', e => {
+  state.sim.on = !state.sim.on;
+  e.currentTarget.setAttribute('aria-pressed', state.sim.on);
+  els.sim.hidden = !state.sim.on;
+  if (state.sim.on) { setSimProgress(0); playSim(); }
+  else { stopSim(); setSimProgress(1); }
+});
+$('#btnSimPlay').addEventListener('click', () => state.sim.playing ? stopSim() : playSim());
+els.simRange.addEventListener('input', () => { stopSim(); setSimProgress(els.simRange.value / 1000); });
 
 // Tooltips
-function showTooltipFor(btn) {
-  const data = btn.getAttribute('data-tooltip');
-  if (!data) return;
-  const [title, body] = data.split('|||');
-  tooltip.querySelector('.tt-title').textContent = title;
-  tooltip.querySelector('.tt-body').innerHTML = body;
+document.addEventListener('pointerover', e => { const b = e.target.closest('.tip-btn'); if (b) showTip(b); });
+document.addEventListener('pointerout', e => { const b = e.target.closest('.tip-btn'); if (b) hideTip(b); });
+document.addEventListener('focusin', e => { const b = e.target.closest('.tip-btn'); if (b) showTip(b); });
+document.addEventListener('focusout', e => { const b = e.target.closest('.tip-btn'); if (b) hideTip(b); });
+document.addEventListener('click', e => { if (e.target.closest('.tip-btn')) e.preventDefault(); });
 
-  const rect = btn.getBoundingClientRect();
-  const sidebar = document.querySelector('.sidebar');
-  const sidebarRight = sidebar.getBoundingClientRect().right;
-  tooltip.classList.add('visible');
+// Theme
+$('#btnTheme').addEventListener('click', () => {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
+  onThemeChange();
+});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onThemeChange);
 
-  // Position: right of sidebar on desktop, below button on mobile
-  const isMobile = window.innerWidth <= 768;
-  if (isMobile) {
-    tooltip.style.left = Math.max(10, rect.left) + 'px';
-    tooltip.style.top = (rect.bottom + 8) + 'px';
-  } else {
-    let top = rect.top - 8;
-    const ttH = tooltip.offsetHeight;
-    if (top + ttH > window.innerHeight - 10) top = window.innerHeight - ttH - 10;
-    if (top < 10) top = 10;
-    tooltip.style.left = (sidebarRight + 10) + 'px';
-    tooltip.style.top = top + 'px';
+// Shortcuts
+$('#btnShortcuts').addEventListener('click', () => els.shortcutsDialog.showModal());
+document.addEventListener('keydown', e => {
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === 'o') { e.preventDefault(); openPicker(); return; }
+  if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); downloadPlt(); return; }
+  if (mod || e.altKey) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'select' || tag === 'textarea' || document.querySelector('dialog[open]')) return;
+  switch (e.key) {
+    case '?': els.shortcutsDialog.showModal(); break;
+    case '1': if (state.file) selectTab('preview'); break;
+    case '2': if (state.file) selectTab('code'); break;
+    case '3': if (state.file) selectTab('source'); break;
   }
-}
-
-function hideTooltip() {
-  tooltip.classList.remove('visible');
-}
-
-document.addEventListener('mouseover', e => {
-  const btn = e.target.closest('.info-btn');
-  if (btn) showTooltipFor(btn);
+  if (state.tab !== 'preview' || !state.file) return;
+  switch (e.key) {
+    case 'f': case 'F': fitView(); break;
+    case '+': case '=': zoomAt(cssW / 2, cssH / 2, 1.25); break;
+    case '-': case '_': zoomAt(cssW / 2, cssH / 2, 0.8); break;
+    case 't': case 'T': $('#btnTravel').click(); break;
+  }
 });
 
-document.addEventListener('mouseout', e => {
-  const btn = e.target.closest('.info-btn');
-  if (btn) hideTooltip();
-});
+/* ═══════════════════════════════════════════════
+   15. INIT
+   ═══════════════════════════════════════════════ */
 
-document.addEventListener('focusin', e => {
-  const btn = e.target.closest('.info-btn');
-  if (btn) showTooltipFor(btn);
-});
-
-document.addEventListener('focusout', e => {
-  const btn = e.target.closest('.info-btn');
-  if (btn) hideTooltip();
-});
-
-// Init hatch preview
-updateHatchPreview();
-
+(function init() {
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+  } catch (e) { /* ignore */ }
+  mountIcons();
+  writeSettings({ ...DEFAULTS, ...(loadSettingsLocal() || {}) });
+  $$('.tab').forEach(t => { if (t.dataset.tab !== 'preview') t.disabled = true; });
+  readColors();
+  updateOutputs();
+  resizeCanvas();
+})();
 </script>
 </body>
 </html>
