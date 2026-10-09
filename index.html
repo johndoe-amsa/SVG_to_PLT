@@ -649,7 +649,68 @@ fieldset:disabled .field, fieldset:disabled .switch-row, fieldset:disabled .hatc
   background-size: 16px 16px;
 }
 #viewport.panning { cursor: grabbing; }
-#viewport canvas { display: block; width: 100%; height: 100%; }
+#stage { display: block; width: 100%; height: 100%; overflow: hidden; }
+#stage path, #stage rect { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.p-box { stroke: var(--text-2); stroke-width: 1; stroke-dasharray: 4 4; opacity: 0.7; }
+.p-bounds { stroke: var(--border); stroke-width: 1; fill: var(--bg) !important; fill-opacity: 0.6; }
+.p-ghost { stroke: var(--border); stroke-width: 1; }
+.p-travel { stroke: var(--success); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.6; }
+.p-hatch { stroke: var(--text); stroke-width: 0.75; opacity: 0.75; }
+.p-contour { stroke: var(--text); stroke-width: 1.25; }
+.p-dim path { stroke: var(--text-2); stroke-width: 1; fill: none; }
+.p-dim text, .p-origin text { font-family: var(--mono); font-size: 11px; fill: var(--text-2); }
+.p-dim text { paint-order: stroke; stroke: var(--bg-2); stroke-width: 4px; stroke-linejoin: round; }
+.p-origin circle { fill: var(--bg); stroke: var(--error); stroke-width: 1.5; }
+.p-origin path { stroke: var(--error); stroke-width: 1; }
+.p-origin text { fill: var(--error); }
+.p-head { fill: var(--success); }
+
+/* Dimensions */
+.size-row { display: grid; grid-template-columns: 1fr 24px 1fr; gap: 8px; align-items: end; }
+.size-link { height: 40px; display: grid; place-items: center; color: var(--text-2); }
+.size-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); margin-top: -8px; min-height: 18px; }
+.link-btn { font-size: 12px; font-weight: 500; color: var(--text); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border); border-radius: 4px; transition: text-decoration-color var(--t-micro); white-space: nowrap; }
+.link-btn:hover { text-decoration-color: var(--text); }
+
+/* Origin picker */
+.origin-row { display: flex; gap: 16px; align-items: center; }
+.origin-grid {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 24px);
+  grid-template-rows: repeat(3, 24px);
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+  background: var(--bg-2);
+  position: relative;
+}
+.origin-grid::before {
+  content: '';
+  position: absolute;
+  inset: 20px;
+  border: 1px dashed var(--border);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.origin-grid label { position: relative; display: grid; place-items: center; cursor: pointer; z-index: 1; }
+.origin-grid input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.origin-grid span {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--text-2);
+  background: var(--bg);
+  transition: transform var(--t-micro), background-color var(--t-micro), border-color var(--t-micro);
+}
+.origin-grid label:hover span { border-color: var(--text); transform: scale(1.2); }
+.origin-grid input:checked + span { background: var(--text); border-color: var(--text); transform: scale(1.2); }
+.origin-grid input:focus-visible + span { outline: 2px solid var(--border-strong); outline-offset: 2px; }
+.origin-text { display: grid; gap: 4px; }
+.origin-text b { font-size: 13px; font-weight: 500; }
+.origin-text small { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+
+/* Range + number */
+.range-num { display: grid; grid-template-columns: 1fr 112px; gap: 16px; align-items: center; }
 .hud {
   position: absolute;
   display: flex;
@@ -705,7 +766,7 @@ fieldset:disabled .field, fieldset:disabled .switch-row, fieldset:disabled .hatc
 }
 .is-busy .skeleton-layer { display: grid; }
 .skel { background: var(--skeleton); border-radius: var(--r-badge); animation: pulse 1.5s ease-in-out infinite; }
-.skel-page { width: min(320px, 60%); aspect-ratio: 210 / 297; max-height: 80%; border-radius: 2px; display: grid; place-items: center; }
+.skel-page { width: min(320px, 60%); aspect-ratio: 4 / 3; max-height: 80%; border-radius: 2px; display: grid; place-items: center; }
 .skel-page::after { content: ''; width: 50%; height: 30%; border-radius: var(--r-badge); background: var(--bg-2); opacity: 0.6; }
 .skel-text { display: inline-block; width: 40px; height: 12px; vertical-align: middle; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
@@ -990,76 +1051,70 @@ dialog.sheet form { display: grid; gap: 24px; }
 
       <form id="settings" autocomplete="off" novalidate>
 
-        <!-- Page -->
+        <!-- Dimensions -->
         <details class="section" open>
-          <summary>Page <span class="pill" id="pagePill">A4</span><i data-icon="chevron" class="chev"></i></summary>
+          <summary>Dimensions <span class="pill" id="sizePill">—</span><i data-icon="chevron" class="chev"></i></summary>
           <div class="section-body">
-            <div class="field">
-              <label class="field-label" for="pageFormat">Format</label>
-              <div class="select-wrap">
-                <select class="control" id="pageFormat" name="pageFormat">
-                  <option value="a5">A5 — 148 × 210 mm</option>
-                  <option value="a4">A4 — 210 × 297 mm</option>
-                  <option value="a3">A3 — 297 × 420 mm</option>
-                  <option value="a2">A2 — 420 × 594 mm</option>
-                  <option value="a1">A1 — 594 × 841 mm</option>
-                  <option value="a0">A0 — 841 × 1189 mm</option>
-                  <option value="letter">Letter — 216 × 279 mm</option>
-                  <option value="custom">Personnalisé</option>
-                </select>
-                <i data-icon="chevron"></i>
-              </div>
-            </div>
-            <div class="segmented" role="radiogroup" aria-label="Orientation">
-              <label><input type="radio" name="orientation" value="portrait" checked><span>Portrait</span></label>
-              <label><input type="radio" name="orientation" value="landscape"><span>Paysage</span></label>
-            </div>
-            <div class="row">
+            <div class="size-row">
               <div class="field">
-                <label class="field-label" for="pageW">Largeur</label>
-                <div class="input-unit"><input class="control" type="number" id="pageW" name="pageW" value="210" min="1" step="1" inputmode="decimal"><span class="unit">mm</span></div>
+                <label class="field-label" for="sizeW">Largeur</label>
+                <div class="input-unit"><input class="control" type="number" id="sizeW" min="0.001" step="0.1" inputmode="decimal" disabled><span class="unit">mm</span></div>
               </div>
+              <span class="size-link" title="Proportions conservées" aria-hidden="true"><i data-icon="link"></i></span>
               <div class="field">
-                <label class="field-label" for="pageH">Hauteur</label>
-                <div class="input-unit"><input class="control" type="number" id="pageH" name="pageH" value="297" min="1" step="1" inputmode="decimal"><span class="unit">mm</span></div>
+                <label class="field-label" for="sizeH">Hauteur</label>
+                <div class="input-unit"><input class="control" type="number" id="sizeH" min="0.001" step="0.1" inputmode="decimal" disabled><span class="unit">mm</span></div>
               </div>
             </div>
-            <div class="field">
-              <label class="field-label" for="margin">Marge
-                <button type="button" class="tip-btn" data-tip="Zone de sécurité autour du tracé. 5 à 10 mm sont recommandés pour la plupart des graveurs laser." aria-label="Aide : marge"><i data-icon="info"></i></button>
-              </label>
-              <div class="input-unit"><input class="control" type="number" id="margin" name="margin" value="5" min="0" step="0.5" inputmode="decimal"><span class="unit">mm</span></div>
-              <div class="field-error" id="pageError"></div>
+            <div class="size-meta">
+              <span id="sizeHint">Importez un fichier pour définir sa taille</span>
+              <button class="link-btn" type="button" id="btnSizeReset" hidden>Taille d'origine</button>
             </div>
+            <div class="field-error" id="sizeError"></div>
           </div>
         </details>
 
-        <!-- Placement -->
+        <!-- Position -->
         <details class="section" open>
-          <summary>Placement<i data-icon="chevron" class="chev"></i></summary>
+          <summary>Origine &amp; marge <span class="pill" id="originPill">Bas gauche</span><i data-icon="chevron" class="chev"></i></summary>
           <div class="section-body">
-            <div class="field">
-              <span class="field-label">Échelle
-                <button type="button" class="tip-btn" data-tip="Ajuster : remplit la zone utile en conservant les proportions. Réelle : respecte les dimensions physiques du fichier (width/height du SVG, unités $INSUNITS du DXF). Personnalisée : pourcentage de la taille réelle." aria-label="Aide : échelle"><i data-icon="info"></i></button>
-              </span>
-              <div class="segmented" role="radiogroup" aria-label="Échelle">
-                <label><input type="radio" name="scaleMode" value="fit" checked><span>Ajuster</span></label>
-                <label><input type="radio" name="scaleMode" value="real"><span>Réelle</span></label>
-                <label><input type="radio" name="scaleMode" value="custom"><span>Perso.</span></label>
+            <div class="origin-row">
+              <div class="origin-grid" role="radiogroup" aria-label="Point d'origine">
+                <label title="Haut gauche"><input type="radio" name="origin" value="tl" aria-label="Haut gauche"><span></span></label>
+                <label title="Haut centre"><input type="radio" name="origin" value="tc" aria-label="Haut centre"><span></span></label>
+                <label title="Haut droite"><input type="radio" name="origin" value="tr" aria-label="Haut droite"><span></span></label>
+                <label title="Milieu gauche"><input type="radio" name="origin" value="ml" aria-label="Milieu gauche"><span></span></label>
+                <label title="Centre"><input type="radio" name="origin" value="mc" aria-label="Centre"><span></span></label>
+                <label title="Milieu droite"><input type="radio" name="origin" value="mr" aria-label="Milieu droite"><span></span></label>
+                <label title="Bas gauche"><input type="radio" name="origin" value="bl" aria-label="Bas gauche" checked><span></span></label>
+                <label title="Bas centre"><input type="radio" name="origin" value="bc" aria-label="Bas centre"><span></span></label>
+                <label title="Bas droite"><input type="radio" name="origin" value="br" aria-label="Bas droite"><span></span></label>
+              </div>
+              <div class="origin-text">
+                <b>Point d'origine (0, 0)</b>
+                <small>Position du zéro machine par rapport au tracé. Les coordonnées situées avant l'origine sont négatives.</small>
               </div>
             </div>
-            <div class="field" id="scalePctField" hidden>
-              <label class="field-label" for="scalePct">Facteur d'échelle</label>
-              <div class="input-unit"><input class="control" type="number" id="scalePct" name="scalePct" value="100" min="1" step="1" inputmode="decimal"><span class="unit">%</span></div>
-            </div>
-            <div class="field">
-              <span class="field-label">Alignement</span>
-              <div class="segmented" role="radiogroup" aria-label="Alignement">
-                <label><input type="radio" name="align" value="center" checked><span>Centré</span></label>
-                <label><input type="radio" name="align" value="top-left"><span>Haut-gauche</span></label>
-                <label><input type="radio" name="align" value="bottom-left"><span>Bas-gauche</span></label>
+            <label class="switch-row">
+              <span class="switch-text"><b>Ajouter une marge</b><small>Décale le tracé par rapport à l'origine</small></span>
+              <input type="checkbox" class="switch" name="marginEnable" id="marginEnable">
+            </label>
+            <fieldset id="marginFields" disabled>
+              <div class="field">
+                <label class="field-label" for="margin">Marge
+                  <button type="button" class="tip-btn" data-tip="Espace ajouté autour du tracé. L'origine est alors placée sur le cadre élargi (pointillés dans l'aperçu)." aria-label="Aide : marge"><i data-icon="info"></i></button>
+                </label>
+                <div class="input-unit"><input class="control" type="number" id="margin" name="margin" value="5" min="0" step="0.5" inputmode="decimal"><span class="unit">mm</span></div>
+                <div class="field-error" id="marginError"></div>
               </div>
-            </div>
+            </fieldset>
+          </div>
+        </details>
+
+        <!-- Transformation -->
+        <details class="section" open>
+          <summary>Transformation<i data-icon="chevron" class="chev"></i></summary>
+          <div class="section-body">
             <div class="field">
               <span class="field-label">Rotation</span>
               <div class="segmented" role="radiogroup" aria-label="Rotation">
@@ -1085,7 +1140,7 @@ dialog.sheet form { display: grid; gap: 24px; }
                 <button type="button" class="tip-btn" data-tip="Nombre de segments utilisés pour approximer chaque courbe de Bézier ou arc. Bas : fichier léger, rendu anguleux. Haut : rendu lisse, fichier plus lourd." aria-label="Aide : résolution"><i data-icon="info"></i></button>
                 <output class="value" for="curveRes" id="curveResOut">32</output>
               </label>
-              <input type="range" id="curveRes" name="curveRes" min="8" max="128" step="8" value="32">
+              <input type="range" id="curveRes" name="curveRes" min="8" max="256" step="8" value="32">
             </div>
             <label class="switch-row">
               <span class="switch-text"><b>Optimiser les déplacements</b><small>Réordonne les tracés pour réduire les trajets à vide</small></span>
@@ -1127,16 +1182,18 @@ dialog.sheet form { display: grid; gap: 24px; }
               </div>
               <div class="field">
                 <label class="field-label" for="hatchSpacing">Espacement
-                  <button type="button" class="tip-btn" data-tip="Distance entre deux lignes de hachure. Fin (0,1–0,3 mm) : remplissage dense. Large (1–3 mm) : motif aéré." aria-label="Aide : espacement"><i data-icon="info"></i></button>
-                  <output class="value" for="hatchSpacing" id="hatchSpacingOut">0,5 mm</output>
+                  <button type="button" class="tip-btn" data-tip="Distance entre deux lignes de hachure, de 0,025 mm (résolution HPGL) à 5 mm. Très fin (0,03–0,1 mm) : petites gravures pleines. Large (1–5 mm) : motif aéré." aria-label="Aide : espacement"><i data-icon="info"></i></button>
                 </label>
-                <input type="range" id="hatchSpacing" name="hatchSpacing" min="0.1" max="3" step="0.1" value="0.5">
+                <div class="range-num">
+                  <input type="range" id="hatchSpacingRange" min="0" max="1000" step="1" value="500" aria-label="Espacement (curseur)">
+                  <div class="input-unit"><input class="control" type="number" id="hatchSpacing" name="hatchSpacing" value="0.5" min="0.025" max="5" step="0.005" inputmode="decimal"><span class="unit">mm</span></div>
+                </div>
               </div>
               <div class="field">
                 <label class="field-label" for="hatchAngle">Angle
                   <output class="value" for="hatchAngle" id="hatchAngleOut">45°</output>
                 </label>
-                <input type="range" id="hatchAngle" name="hatchAngle" min="0" max="175" step="5" value="45">
+                <input type="range" id="hatchAngle" name="hatchAngle" min="0" max="179" step="1" value="45">
               </div>
               <label class="switch-row">
                 <span class="switch-text"><b>Conserver les contours</b></span>
@@ -1200,7 +1257,22 @@ dialog.sheet form { display: grid; gap: 24px; }
     <div class="ws-body" id="wsBody">
       <div class="panel" id="panel-preview" role="tabpanel" aria-labelledby="tab-preview">
         <div id="viewport" aria-label="Aperçu du tracé. Molette pour zoomer, glisser pour déplacer, double-clic pour ajuster.">
-          <canvas id="canvas"></canvas>
+          <svg id="stage" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <g id="world">
+              <rect id="pBox" class="p-box" vector-effect="non-scaling-stroke"/>
+              <rect id="pBounds" class="p-bounds" vector-effect="non-scaling-stroke"/>
+              <path id="pGhost" class="p-ghost" vector-effect="non-scaling-stroke"/>
+              <path id="pTravel" class="p-travel" vector-effect="non-scaling-stroke"/>
+              <path id="pHatch" class="p-hatch" vector-effect="non-scaling-stroke"/>
+              <path id="pContour" class="p-contour" vector-effect="non-scaling-stroke"/>
+            </g>
+            <g id="overlay">
+              <g id="dimW" class="p-dim"><path/><text text-anchor="middle"></text></g>
+              <g id="dimH" class="p-dim"><path/><text text-anchor="middle"></text></g>
+              <g id="originMark" class="p-origin"><circle r="5"/><path d="M-12 0H12M0 -12V12"/><text x="8" y="18">0,0</text></g>
+              <circle id="headMark" class="p-head" r="4"/>
+            </g>
+          </svg>
         </div>
         <div class="sim" id="sim" hidden>
           <button class="icon-btn" type="button" id="btnSimPlay" aria-label="Lecture"><i data-icon="play"></i></button>
@@ -1311,14 +1383,15 @@ const PX_MM = 25.4 / 96;        // CSS px → mm
 const STORAGE_KEY = 'laserplot:settings:v2';
 const THEME_KEY = 'theme';
 
-const PAGE_FORMATS = {
-  a5: [148, 210], a4: [210, 297], a3: [297, 420], a2: [420, 594],
-  a1: [594, 841], a0: [841, 1189], letter: [216, 279]
+const ORIGINS = {
+  tl: [0, 1, 'Haut gauche'], tc: [0.5, 1, 'Haut centre'], tr: [1, 1, 'Haut droite'],
+  ml: [0, 0.5, 'Milieu gauche'], mc: [0.5, 0.5, 'Centre'], mr: [1, 0.5, 'Milieu droite'],
+  bl: [0, 0, 'Bas gauche'], bc: [0.5, 0, 'Bas centre'], br: [1, 0, 'Bas droite']
 };
+const SPACING_MIN = 0.025, SPACING_MAX = 5; // 0,025 mm = 1 unité HPGL
 
 const DEFAULTS = {
-  pageFormat: 'a4', orientation: 'portrait', pageW: 210, pageH: 297, margin: 5,
-  scaleMode: 'fit', scalePct: 100, align: 'center', rotation: '0', mirror: false,
+  origin: 'bl', marginEnable: false, margin: 5, rotation: '0', mirror: false,
   curveRes: 32, optimize: true, speedDraw: 20, speedTravel: 150,
   hatchEnable: false, hatchType: 'lines', hatchSpacing: 0.5, hatchAngle: 45,
   hatchContoursAlso: true, hatchBidirectional: true
@@ -1351,6 +1424,7 @@ const ICONS = {
   fit: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
   copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
   error: '<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
@@ -2257,13 +2331,13 @@ function shapesToSvg(shapes) {
 }
 
 /* ═══════════════════════════════════════════════
-   5. LAYOUT (user units → page mm, Y up)
+   5. LAYOUT (user units → machine mm, Y up, origin chosen on the drawing)
    ═══════════════════════════════════════════════ */
 
-function layoutShapes(shapes, info, s) {
+function orientShapes(shapes, s) {
   const rot = parseInt(s.rotation, 10) || 0;
   const orient = (p) => {
-    let x = s.mirror ? -p.x : p.x, y = p.y;
+    const x = s.mirror ? -p.x : p.x, y = p.y;
     switch (rot) { // clockwise, in SVG (Y-down) space
       case 90: return { x: -y, y: x };
       case 180: return { x: -x, y: -y };
@@ -2271,52 +2345,34 @@ function layoutShapes(shapes, info, s) {
       default: return { x, y };
     }
   };
-  const oriented = shapes.map(sh => ({ closed: sh.closed, polys: sh.polys.map(pl => pl.map(orient)) }));
-
+  const out = shapes.map(sh => ({ closed: sh.closed, polys: sh.polys.map(pl => pl.map(orient)) }));
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const sh of oriented) for (const pl of sh.polys) for (const p of pl) {
+  for (const sh of out) for (const pl of sh.polys) for (const p of pl) {
     if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
     if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
   }
-  const bbW = maxX - minX, bbH = maxY - minY;
-  const usableW = s.pageW - 2 * s.margin, usableH = s.pageH - 2 * s.margin;
+  return { shapes: out, minX, minY, maxX, maxY, bbW: maxX - minX, bbH: maxY - minY };
+}
 
-  let scale;
-  if (s.scaleMode === 'fit') {
-    const sx = bbW > 1e-9 ? usableW / bbW : Infinity;
-    const sy = bbH > 1e-9 ? usableH / bbH : Infinity;
-    scale = Math.min(sx, sy);
-    if (!isFinite(scale)) scale = info.unitMM;
-  } else if (s.scaleMode === 'custom') {
-    scale = info.unitMM * s.scalePct / 100;
-  } else {
-    scale = info.unitMM;
-  }
-
-  const w = bbW * scale, h = bbH * scale;
-  let ox, oy;
-  if (s.align === 'center') {
-    ox = s.margin + (usableW - w) / 2;
-    oy = s.margin + (usableH - h) / 2;
-  } else if (s.align === 'top-left') {
-    ox = s.margin;
-    oy = s.pageH - s.margin - h;
-  } else {
-    ox = s.margin;
-    oy = s.margin;
-  }
-
-  const out = oriented.map(sh => ({
+function layoutShapes(shapes, scale, s) {
+  const o = orientShapes(shapes, s);
+  const w = o.bbW * scale, h = o.bbH * scale;
+  const m = s.marginEnable ? s.margin : 0;
+  const [fx, fy] = ORIGINS[s.origin] || ORIGINS.bl;
+  // Work box = drawing + margin; the origin sits on one of its 9 reference points
+  const boxW = w + 2 * m, boxH = h + 2 * m;
+  const bx = -fx * boxW, by = -fy * boxH;
+  const ox = bx + m, oy = by + m;
+  const out = o.shapes.map(sh => ({
     closed: sh.closed,
-    polys: sh.polys.map(pl => pl.map(p => ({ x: ox + (p.x - minX) * scale, y: oy + (maxY - p.y) * scale })))
+    polys: sh.polys.map(pl => pl.map(p => ({ x: ox + (p.x - o.minX) * scale, y: oy + (o.maxY - p.y) * scale })))
   }));
-  const eps = 0.01;
   return {
     shapes: out,
     bounds: { x: ox, y: oy, w, h },
-    scale,
-    overflow: ox < -eps || oy < -eps || ox + w > s.pageW + eps || oy + h > s.pageH + eps,
-    outsideMargin: w > usableW + eps || h > usableH + eps
+    box: { x: bx, y: by, w: boxW, h: boxH },
+    bbW: o.bbW, bbH: o.bbH,
+    scale
   };
 }
 
@@ -2531,7 +2587,8 @@ const state = {
   showTravel: true,
   sim: { on: false, progress: 1, playing: false, raf: 0 },
   view: { zoom: 1, x: 0, y: 0, fitted: true, fitZoom: 1 },
-  colors: null
+  scale: 1,            // mm per source unit (per file)
+  bb: null,            // oriented bbox of the source, in source units
 };
 
 const els = {
@@ -2551,7 +2608,9 @@ const els = {
   wsBody: $('#wsBody'),
   empty: $('#empty'),
   viewport: $('#viewport'),
-  canvas: $('#canvas'),
+  stage: $('#stage'),
+  sizeW: $('#sizeW'),
+  sizeH: $('#sizeH'),
   hudCoords: $('#hudCoords'),
   zoomVal: $('#zoomVal'),
   code: $('#code'),
@@ -2583,11 +2642,6 @@ function readSettings() {
 
 function writeSettings(input) {
   const s = { ...input };
-  // Legacy presets (v1): fitPage boolean
-  if (s.fitPage !== undefined && s.scaleMode === undefined) s.scaleMode = s.fitPage ? 'fit' : 'real';
-  if (s.pageW !== undefined && s.pageH !== undefined && s.orientation === undefined) {
-    s.orientation = s.pageW > s.pageH ? 'landscape' : 'portrait';
-  }
   for (const el of els.form.elements) {
     if (!el.name || !(el.name in s) || s[el.name] === undefined || s[el.name] === null) continue;
     const v = s[el.name];
@@ -2595,6 +2649,7 @@ function writeSettings(input) {
     else if (el.type === 'checkbox') el.checked = !!v;
     else el.value = v;
   }
+  spacingToRange();
   syncControls();
 }
 
@@ -2615,36 +2670,86 @@ function setRangeFill(r) {
   r.style.setProperty('--pct', pct + '%');
 }
 
+// Logarithmic slider for the hatch spacing: fine control on small values
+const spacingFromRange = v => SPACING_MIN * Math.pow(SPACING_MAX / SPACING_MIN, v / 1000);
+function spacingToRange() {
+  const v = parseFloat($('#hatchSpacing').value);
+  if (!(v > 0)) return;
+  const c = Math.min(SPACING_MAX, Math.max(SPACING_MIN, v));
+  $('#hatchSpacingRange').value = Math.round(1000 * Math.log(c / SPACING_MIN) / Math.log(SPACING_MAX / SPACING_MIN));
+}
+
 function syncControls() {
   const s = readSettings();
   $('#curveResOut').textContent = s.curveRes;
-  $('#hatchSpacingOut').textContent = fmtNum(s.hatchSpacing, 1) + ' mm';
   $('#hatchAngleOut').textContent = s.hatchAngle + '°';
   $$('input[type="range"]').forEach(setRangeFill);
   $('#hatchFields').disabled = !s.hatchEnable;
-  $('#scalePctField').hidden = s.scaleMode !== 'custom';
+  $('#marginFields').disabled = !s.marginEnable;
   $('#hatchPill').textContent = s.hatchEnable ? (s.hatchType === 'cross' ? 'Croisées' : 'Lignes') : 'Off';
-  const fmt = PAGE_FORMATS[s.pageFormat];
-  $('#pagePill').textContent = fmt ? s.pageFormat.toUpperCase().replace('LETTER', 'Letter') : `${fmtNum(s.pageW)}×${fmtNum(s.pageH)}`;
+  $('#originPill').textContent = (ORIGINS[s.origin] || ORIGINS.bl)[2] + (s.marginEnable && s.margin > 0 ? ` · ${fmtNum(s.margin, 2)} mm` : '');
   updateHatchPreview(s);
+}
+
+function setInvalid(id, msg) {
+  const el = $('#' + id);
+  if (msg) el.setAttribute('aria-invalid', 'true'); else el.removeAttribute('aria-invalid');
 }
 
 function validate(s) {
   const errs = {};
-  if (!(s.pageW > 0)) errs.pageW = 'Largeur invalide';
-  if (!(s.pageH > 0)) errs.pageH = 'Hauteur invalide';
-  if (!(s.margin >= 0)) errs.margin = 'La marge doit être positive ou nulle';
-  else if (s.pageW > 0 && s.pageH > 0 && 2 * s.margin >= Math.min(s.pageW, s.pageH)) errs.margin = 'La marge est plus grande que la page';
-  if (s.scaleMode === 'custom' && !(s.scalePct > 0)) errs.scalePct = 'Facteur invalide';
+  if (s.marginEnable && !(s.margin >= 0)) errs.margin = 'La marge doit être positive ou nulle';
+  if (s.hatchEnable && !(s.hatchSpacing >= SPACING_MIN)) errs.hatchSpacing = `Espacement minimal : ${fmtNum(SPACING_MIN, 3)} mm (résolution HPGL)`;
   if (!(s.speedDraw > 0)) errs.speedDraw = 'Vitesse invalide';
   if (!(s.speedTravel > 0)) errs.speedTravel = 'Vitesse invalide';
-
-  for (const id of ['pageW', 'pageH', 'margin', 'scalePct', 'speedDraw', 'speedTravel']) {
-    const el = $('#' + id);
-    if (errs[id]) el.setAttribute('aria-invalid', 'true'); else el.removeAttribute('aria-invalid');
-  }
-  $('#pageError').textContent = errs.pageW || errs.pageH || errs.margin || '';
+  for (const id of ['margin', 'hatchSpacing', 'speedDraw', 'speedTravel']) setInvalid(id, errs[id]);
+  $('#marginError').textContent = errs.margin || '';
   return Object.keys(errs).length ? errs : null;
+}
+
+/* ── Dimensions (proportional) ── */
+const fmtSize = v => String(Math.round(v * 1000) / 1000);
+
+function updateSizeUI() {
+  const bb = state.bb;
+  const ok = !!(state.file && bb);
+  els.sizeW.disabled = !ok || !(bb.bbW > 0);
+  els.sizeH.disabled = !ok || !(bb.bbH > 0);
+  $('#btnSizeReset').hidden = !ok;
+  if (!ok) {
+    els.sizeW.value = '';
+    els.sizeH.value = '';
+    $('#sizeHint').textContent = 'Importez un fichier pour définir sa taille';
+    $('#sizePill').textContent = '—';
+    return;
+  }
+  const w = bb.bbW * state.scale, h = bb.bbH * state.scale;
+  if (document.activeElement !== els.sizeW) els.sizeW.value = fmtSize(w);
+  if (document.activeElement !== els.sizeH) els.sizeH.value = fmtSize(h);
+  const pct = state.scale / state.info.unitMM * 100;
+  $('#sizeHint').textContent = `${fmtNum(pct, 1)} % de la taille d'origine`;
+  $('#btnSizeReset').disabled = Math.abs(pct - 100) < 1e-6;
+  $('#sizePill').textContent = `${fmtNum(w, 2)} × ${fmtNum(h, 2)}`;
+}
+
+function onSizeInput(which) {
+  const bb = state.bb;
+  if (!bb) return;
+  const input = which === 'w' ? els.sizeW : els.sizeH;
+  const other = which === 'w' ? els.sizeH : els.sizeW;
+  const v = parseFloat(input.value);
+  const ref = which === 'w' ? bb.bbW : bb.bbH;
+  if (!(v > 0) || !(ref > 0)) {
+    input.setAttribute('aria-invalid', 'true');
+    $('#sizeError').textContent = 'Saisissez une dimension supérieure à 0';
+    return;
+  }
+  input.removeAttribute('aria-invalid');
+  $('#sizeError').textContent = '';
+  state.scale = v / ref;
+  other.value = fmtSize((which === 'w' ? bb.bbH : bb.bbW) * state.scale);
+  state.view.fitted = true;
+  scheduleConvert(200);
 }
 
 /* ── Hatch preview (sidebar) ── */
@@ -2731,6 +2836,8 @@ function openFile(name, size, text) {
   state.info = info;
   state.geomCache.clear();
   state.view.fitted = true;
+  state.scale = info.unitMM;
+  state.bb = null;
 
   els.fileThumb.src = url;
   els.sourceImg.src = url;
@@ -2757,8 +2864,10 @@ function closeFile() {
   state.file = null;
   state.info = null;
   state.result = null;
+  state.bb = null;
   state.geomCache.clear();
   stopSim();
+  updateSizeUI();
   els.fileCard.hidden = true;
   els.fileEmpty.hidden = false;
   els.empty.hidden = false;
@@ -2823,7 +2932,8 @@ function convert() {
       return;
     }
 
-    const layout = layoutShapes(shapes, state.info, s);
+    const layout = layoutShapes(shapes, state.scale, s);
+    state.bb = { bbW: layout.bbW, bbH: layout.bbH };
     const { strokes, hatchCount } = buildStrokes(layout, s);
     const ordered = s.optimize ? orderStrokes(strokes) : strokes;
     const plt = emitHPGL(ordered);
@@ -2834,14 +2944,13 @@ function convert() {
 
     if (state.info.textCount) issues.push({ level: 'warn', text: textWarning(state.info.textCount) });
     if (state.info.imageCount) issues.push({ level: 'warn', text: `${state.info.imageCount} image(s) bitmap ignorée(s) — seuls les tracés vectoriels sont convertis.` });
-    if (layout.overflow) issues.push({ level: 'error', text: 'Le dessin dépasse de la page. Réduisez l\'échelle ou passez en mode « Ajuster ».' });
-    else if (layout.outsideMargin) issues.push({ level: 'warn', text: 'Le dessin empiète sur la marge de sécurité.' });
     if (state.info.kind === 'dxf' && state.info.hatchCount) issues.push({ level: 'info', text: `${state.info.hatchCount} hachure(s) DXF ignorée(s) — utilisez l'option « Remplissage » pour hachurer les contours fermés.` });
-    if (s.scaleMode !== 'fit' && !state.info.hasPhysicalSize) {
+    if (!state.info.hasPhysicalSize) {
       issues.push({ level: 'info', text: state.info.kind === 'dxf'
-        ? 'Le DXF ne déclare pas d\'unité ($INSUNITS) : 1 unité = 1 mm.'
-        : 'Le SVG ne déclare pas de dimensions physiques : 1 unité = 1 px (0,265 mm).' });
+        ? 'Le DXF ne déclare pas d\'unité ($INSUNITS) : taille d\'origine calculée avec 1 unité = 1 mm. Ajustez la largeur ou la hauteur si besoin.'
+        : 'Le SVG ne déclare pas de dimensions physiques : taille d\'origine calculée à 96 ppp (1 px = 0,265 mm). Ajustez la largeur ou la hauteur si besoin.' });
     }
+    if (s.hatchEnable && s.hatchSpacing < 0.05) issues.push({ level: 'info', text: `Espacement très fin (${fmtNum(s.hatchSpacing, 3)} mm) : vérifiez qu'il reste supérieur au diamètre du faisceau pour éviter une surbrûlure.` });
     if (s.hatchEnable && !hatchCount) issues.push({ level: 'info', text: 'Aucune forme fermée à hachurer dans ce fichier.' });
     setIssues(issues);
   } catch (e) {
@@ -2850,6 +2959,7 @@ function convert() {
     setIssues([{ level: 'error', text: 'Erreur de conversion : ' + e.message }]);
   }
   state.lastDuration = performance.now() - t0;
+  updateSizeUI();
   updateOutputs();
   if (state.view.fitted) fitView(); else requestRender();
 }
@@ -2925,37 +3035,42 @@ function renderCode() {
    12. CANVAS PREVIEW
    ═══════════════════════════════════════════════ */
 
-const ctx = els.canvas.getContext('2d');
 let renderQueued = false;
 let cssW = 0, cssH = 0;
+const P = {
+  world: $('#world'), box: $('#pBox'), bounds: $('#pBounds'), ghost: $('#pGhost'), travel: $('#pTravel'),
+  hatch: $('#pHatch'), contour: $('#pContour'), dimW: $('#dimW'), dimH: $('#dimH'),
+  origin: $('#originMark'), head: $('#headMark')
+};
+// Path data cache: rebuilt only when the result or the simulated range changes
+let pathCache = { key: '', shown: -1 };
 
-function readColors() {
-  const cs = getComputedStyle(document.documentElement);
-  const v = n => cs.getPropertyValue(n).trim();
-  state.colors = { bg: v('--bg'), bg2: v('--bg-2'), border: v('--border'), text: v('--text'), text2: v('--text-2'), success: v('--success') };
-}
-
-function pageSize() {
-  const s = readSettings();
-  return { W: s.pageW > 0 ? s.pageW : 210, H: s.pageH > 0 ? s.pageH : 297, m: s.margin >= 0 ? s.margin : 0 };
+function viewBounds() {
+  const r = state.result;
+  if (!r) return { x: -10, y: -10, w: 20, h: 20 };
+  const b = r.layout.box;
+  const x0 = Math.min(b.x, 0), y0 = Math.min(b.y, 0);
+  const x1 = Math.max(b.x + b.w, 0), y1 = Math.max(b.y + b.h, 0);
+  return { x: x0, y: y0, w: Math.max(x1 - x0, 1e-3), h: Math.max(y1 - y0, 1e-3) };
 }
 
 function fitView() {
-  const { W, H } = pageSize();
   if (!cssW || !cssH) return;
-  const pad = cssW < 480 ? 24 : 48;
-  const zoom = Math.max(0.01, Math.min((cssW - 2 * pad) / W, (cssH - 2 * pad - 32) / H));
+  const b = viewBounds();
+  const pad = cssW < 480 ? 40 : 64;
+  const zoom = Math.max(1e-3, Math.min((cssW - 2 * pad) / b.w, (cssH - 2 * pad - 48) / b.h));
   state.view.zoom = zoom;
   state.view.fitZoom = zoom;
-  state.view.x = (cssW - W * zoom) / 2;
-  state.view.y = (cssH + H * zoom) / 2;
+  state.view.x = (cssW - b.w * zoom) / 2 - b.x * zoom;
+  state.view.y = (cssH + b.h * zoom) / 2 + b.y * zoom;
   state.view.fitted = true;
   requestRender();
 }
 
 function zoomAt(mx, my, factor) {
   const v = state.view;
-  const nz = Math.min(v.fitZoom * 400, Math.max(v.fitZoom * 0.2, v.zoom * factor));
+  // Up to 40 000 px/mm: ~1 µm per pixel, far below the HPGL step (25 µm)
+  const nz = Math.min(Math.max(v.fitZoom * 2000, 40000), Math.max(v.fitZoom * 0.1, v.zoom * factor));
   const f = nz / v.zoom;
   v.x = mx - (mx - v.x) * f;
   v.y = my - (my - v.y) * f;
@@ -2970,106 +3085,88 @@ function requestRender() {
   requestAnimationFrame(() => { renderQueued = false; render(); });
 }
 
-function resizeCanvas() {
+function resizeStage() {
   const rect = els.viewport.getBoundingClientRect();
   cssW = rect.width; cssH = rect.height;
-  const dpr = window.devicePixelRatio || 1;
-  els.canvas.width = Math.max(1, Math.round(cssW * dpr));
-  els.canvas.height = Math.max(1, Math.round(cssH * dpr));
   if (state.view.fitted) fitView(); else requestRender();
 }
 
-function render() {
-  if (!state.colors) readColors();
-  const C = state.colors;
-  const dpr = window.devicePixelRatio || 1;
-  const v = state.view;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
-  els.zoomVal.textContent = Math.round((v.zoom / (v.fitZoom || 1)) * 100) + '%';
-  if (!state.file) return;
-
-  const { W, H, m } = pageSize();
-  const z = v.zoom;
-  // World (mm, Y up) → device pixels
-  ctx.setTransform(dpr * z, 0, 0, -dpr * z, dpr * v.x, dpr * v.y);
-  const px = 1 / z; // one CSS pixel in mm
-
-  // Sheet
-  ctx.fillStyle = C.bg;
-  ctx.fillRect(0, 0, W, H);
-  ctx.lineWidth = px;
-  ctx.strokeStyle = C.border;
-  ctx.strokeRect(0, 0, W, H);
-  // Margin
-  if (m > 0) {
-    ctx.setLineDash([4 * px, 4 * px]);
-    ctx.strokeRect(m, m, W - 2 * m, H - 2 * m);
-    ctx.setLineDash([]);
-  }
-
-  const r = state.result;
-  if (!r) return;
-
-  const plot = r.plot;
-  const total = plot.length;
-  const limit = state.sim.on ? state.sim.progress : 1;
-  const shown = Math.max(0, Math.min(total, Math.round(total * limit)));
-
-  // Travel moves
-  if (state.showTravel && shown > 0) {
-    ctx.beginPath();
-    let lx = 0, ly = 0;
-    for (let i = 0; i < shown; i++) {
-      const p = plot[i].pts;
-      if (i > 0 && (p[0] !== lx || p[1] !== ly)) { ctx.moveTo(lx, ly); ctx.lineTo(p[0], p[1]); }
-      lx = p[p.length - 2]; ly = p[p.length - 1];
-    }
-    ctx.setLineDash([3 * px, 3 * px]);
-    ctx.strokeStyle = C.success;
-    ctx.globalAlpha = 0.6;
-    ctx.lineWidth = px;
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-  }
-
-  // Ghost of the remaining job during simulation
-  if (shown < total) {
-    ctx.beginPath();
-    for (let i = shown; i < total; i++) tracePts(plot[i].pts);
-    ctx.strokeStyle = C.border;
-    ctx.lineWidth = px;
-    ctx.stroke();
-  }
-
-  // Burned paths: hatches first (thinner), then contours on top
-  const beam = Math.min(0.15, px * 4); // ~beam width when zoomed in
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = C.text;
-  for (const kind of ['hatch', 'contour']) {
-    ctx.beginPath();
-    for (let i = 0; i < shown; i++) if (plot[i].kind === kind) tracePts(plot[i].pts);
-    ctx.lineWidth = Math.max(kind === 'hatch' ? px * 0.6 : px * 1.25, beam);
-    ctx.globalAlpha = kind === 'hatch' ? 0.75 : 1;
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-
-  // Head position
-  if (state.sim.on && shown > 0 && shown < total) {
-    const p = plot[shown - 1].pts;
-    ctx.beginPath();
-    ctx.arc(p[p.length - 2], p[p.length - 1], 4 * px, 0, Math.PI * 2);
-    ctx.fillStyle = C.success;
-    ctx.fill();
-  }
+const num = v => +v.toFixed(4);
+function polyD(p) {
+  let d = 'M' + num(p[0]) + ' ' + num(p[1]);
+  for (let j = 2; j < p.length; j += 2) d += 'L' + num(p[j]) + ' ' + num(p[j + 1]);
+  return d;
 }
 
-function tracePts(p) {
-  ctx.moveTo(p[0], p[1]);
-  for (let j = 2; j < p.length; j += 2) ctx.lineTo(p[j], p[j + 1]);
+function buildPaths(r, shown) {
+  const plot = r.plot;
+  let contour = '', hatch = '', travel = '', ghost = '';
+  let lx = 0, ly = 0;
+  for (let i = 0; i < plot.length; i++) {
+    const p = plot[i].pts;
+    const d = polyD(p);
+    if (i < shown) {
+      if (i > 0 && (p[0] !== lx || p[1] !== ly)) travel += 'M' + num(lx) + ' ' + num(ly) + 'L' + num(p[0]) + ' ' + num(p[1]);
+      if (plot[i].kind === 'hatch') hatch += d; else contour += d;
+      lx = p[p.length - 2]; ly = p[p.length - 1];
+    } else ghost += d;
+  }
+  P.contour.setAttribute('d', contour);
+  P.hatch.setAttribute('d', hatch);
+  P.travel.setAttribute('d', travel);
+  P.ghost.setAttribute('d', ghost);
+}
+
+function setRect(el, b) {
+  el.setAttribute('x', b.x); el.setAttribute('y', b.y);
+  el.setAttribute('width', Math.max(0, b.w)); el.setAttribute('height', Math.max(0, b.h));
+}
+
+function render() {
+  const v = state.view;
+  els.zoomVal.textContent = Math.round((v.zoom / (v.fitZoom || 1)) * 100) + '%';
+  const r = state.file && state.result;
+  els.stage.style.visibility = r ? 'visible' : 'hidden';
+  if (!r) { pathCache = { key: '', shown: -1 }; return; }
+
+  const total = r.plot.length;
+  const shown = state.sim.on ? Math.max(0, Math.min(total, Math.round(total * state.sim.progress))) : total;
+  if (pathCache.key !== r || pathCache.shown !== shown) {
+    buildPaths(r, shown);
+    pathCache = { key: r, shown };
+  }
+
+  // World (mm, Y up) → screen px. Strokes use non-scaling-stroke: always crisp hairlines.
+  P.world.setAttribute('transform', `matrix(${v.zoom} 0 0 ${-v.zoom} ${v.x} ${v.y})`);
+  P.travel.style.display = state.showTravel ? '' : 'none';
+
+  const L = r.layout, b = L.bounds;
+  setRect(P.bounds, b);
+  P.box.style.display = r.settings.marginEnable && r.settings.margin > 0 ? '' : 'none';
+  setRect(P.box, L.box);
+
+  // Screen-space overlay: dimension lines, origin, head
+  const sx = x => v.x + x * v.zoom, sy = y => v.y - y * v.zoom;
+  const left = sx(b.x), right = sx(b.x + b.w), top = sy(b.y + b.h), bottom = sy(b.y);
+  const gap = 16;
+  const wy = top - gap;
+  P.dimW.querySelector('path').setAttribute('d', `M${left} ${wy}H${right}M${left} ${wy - 4}V${wy + 4}M${right} ${wy - 4}V${wy + 4}`);
+  const tw = P.dimW.querySelector('text');
+  tw.setAttribute('x', (left + right) / 2); tw.setAttribute('y', wy - 6);
+  tw.textContent = fmtNum(b.w, 3) + ' mm';
+  const hx = left - gap;
+  P.dimH.querySelector('path').setAttribute('d', `M${hx} ${top}V${bottom}M${hx - 4} ${top}H${hx + 4}M${hx - 4} ${bottom}H${hx + 4}`);
+  const th = P.dimH.querySelector('text');
+  th.setAttribute('transform', `translate(${hx - 6} ${(top + bottom) / 2}) rotate(-90)`);
+  th.textContent = fmtNum(b.h, 3) + ' mm';
+  P.origin.setAttribute('transform', `translate(${sx(0)} ${sy(0)})`);
+
+  if (state.sim.on && shown > 0 && shown < total) {
+    const p = r.plot[shown - 1].pts;
+    P.head.setAttribute('cx', sx(p[p.length - 2]));
+    P.head.setAttribute('cy', sy(p[p.length - 1]));
+    P.head.style.display = '';
+  } else P.head.style.display = 'none';
 }
 
 /* ── Pointer interaction: pan, pinch, wheel ── */
@@ -3091,7 +3188,8 @@ els.viewport.addEventListener('pointermove', e => {
   const mx = e.clientX - rect.left, my = e.clientY - rect.top;
   if (state.file) {
     const X = (mx - state.view.x) / state.view.zoom, Y = (state.view.y - my) / state.view.zoom;
-    els.hudCoords.textContent = `X ${fmtNum(X, 1)} · Y ${fmtNum(Y, 1)} mm`;
+    const dec = state.view.zoom > 200 ? 3 : state.view.zoom > 20 ? 2 : 1;
+    els.hudCoords.textContent = `X ${fmtNum(X, dec)} · Y ${fmtNum(Y, dec)} mm`;
   }
   const prev = pointers.get(e.pointerId);
   if (!prev) return;
@@ -3126,7 +3224,7 @@ els.viewport.addEventListener('wheel', e => {
 }, { passive: false });
 els.viewport.addEventListener('dblclick', fitView);
 
-new ResizeObserver(resizeCanvas).observe(els.viewport);
+new ResizeObserver(resizeStage).observe(els.viewport);
 
 /* ── Simulation ── */
 function stopSim() {
@@ -3175,7 +3273,7 @@ function selectTab(name) {
   $('#tools-preview').hidden = name !== 'preview';
   $('#tools-code').hidden = name !== 'code';
   if (name === 'code') renderCode();
-  if (name === 'preview') resizeCanvas();
+  if (name === 'preview') resizeStage();
 }
 
 function toast(message, type = 'success') {
@@ -3215,7 +3313,6 @@ function currentTheme() {
   return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 function onThemeChange() {
-  readColors();
   requestRender();
 }
 
@@ -3301,43 +3398,32 @@ window.addEventListener('drop', e => {
 els.form.addEventListener('submit', e => e.preventDefault());
 els.form.addEventListener('input', e => {
   const t = e.target;
-  if (t.name === 'pageW' || t.name === 'pageH') {
-    const W = parseFloat($('#pageW').value), H = parseFloat($('#pageH').value);
-    const match = Object.entries(PAGE_FORMATS).find(([, f]) => (f[0] === W && f[1] === H) || (f[0] === H && f[1] === W));
-    $('#pageFormat').value = match ? match[0] : 'custom';
-    if (W > 0 && H > 0 && W !== H) {
-      for (const r of els.form.elements.orientation) r.checked = r.value === (W > H ? 'landscape' : 'portrait');
-    }
+  if (t === els.sizeW) { onSizeInput('w'); return; }
+  if (t === els.sizeH) { onSizeInput('h'); return; }
+  if (t.id === 'hatchSpacingRange') {
+    const v = spacingFromRange(+t.value);
+    $('#hatchSpacing').value = v < 0.1 ? v.toFixed(3) : v < 1 ? v.toFixed(2) : v.toFixed(1);
+  } else if (t.id === 'hatchSpacing') {
+    spacingToRange();
   }
   syncControls();
   saveSettingsLocal();
-  if (t.name === 'pageW' || t.name === 'pageH') state.view.fitted = true;
   scheduleConvert(t.type === 'range' ? 80 : 200);
 });
 els.form.addEventListener('change', e => {
   const t = e.target;
-  if (t.name === 'pageFormat') {
-    const f = PAGE_FORMATS[t.value];
-    if (f) {
-      const land = readSettings().orientation === 'landscape';
-      $('#pageW').value = land ? f[1] : f[0];
-      $('#pageH').value = land ? f[0] : f[1];
-    }
-    state.view.fitted = true;
-  }
-  if (t.name === 'orientation') {
-    const W = parseFloat($('#pageW').value), H = parseFloat($('#pageH').value);
-    const wantLand = t.value === 'landscape';
-    if ((wantLand && W < H) || (!wantLand && W > H)) {
-      $('#pageW').value = H;
-      $('#pageH').value = W;
-    }
-    state.view.fitted = true;
-  }
+  if (t === els.sizeW || t === els.sizeH) { updateSizeUI(); return; }
+  if (t.name === 'rotation' || t.name === 'origin' || t.name === 'marginEnable' || t.name === 'margin') state.view.fitted = true;
   syncControls();
   saveSettingsLocal();
   scheduleConvert(0);
-  if (state.view.fitted) requestAnimationFrame(fitView);
+});
+$('#btnSizeReset').addEventListener('click', () => {
+  if (!state.info) return;
+  state.scale = state.info.unitMM;
+  state.view.fitted = true;
+  updateSizeUI();
+  scheduleConvert(0);
 });
 
 // Presets
@@ -3493,9 +3579,9 @@ document.addEventListener('keydown', e => {
   mountIcons();
   writeSettings({ ...DEFAULTS, ...(loadSettingsLocal() || {}) });
   $$('.tab').forEach(t => { if (t.dataset.tab !== 'preview') t.disabled = true; });
-  readColors();
   updateOutputs();
-  resizeCanvas();
+  updateSizeUI();
+  resizeStage();
 })();
 </script>
 </body>
